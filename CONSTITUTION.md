@@ -1,10 +1,16 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change  : (template) → 1.0.0
-Added sections  : Core Principles (I–VII), Code Quality, Security,
-                  Non-functional Requirements, Governance
-Removed sections: n/a (first ratification of template)
+Version change  : 1.0.0 → 2.0.0
+Rationale       : Project stack corrected from Python to Go (chaincode) + JavaScript
+                  (API gateway, web UI), matching docs/spec.md, docs/design.md, docs/plan.md.
+                  This is a full redefinition of the Coding Standards and Quality Gates
+                  principles (MAJOR per own amendment rule), plus a new Fabric-specific
+                  determinism principle.
+Added sections  : Core Principles III (Chaincode Determinism)
+Changed sections: Core Principles I–II (Go/JS coding standards replace PEP 8), Quality Gates,
+                  Testing Principles, Assertive Programming, Logging Policy, Security
+Removed sections: Python-specific tooling references (pylint, mypy, qa_tools/, build_scripts/)
 TODOs           : none — all placeholders resolved
 -->
 
@@ -12,49 +18,79 @@ TODOs           : none — all placeholders resolved
 
 ## Core Principles
 
-### I. Coding Standards (NON-NEGOTIABLE)
+### I. Coding Standards — Go / Chaincode (NON-NEGOTIABLE)
 
-All Python source MUST conform to PEP 8 with a maximum line length of 100 characters.
+All chaincode lives under `chaincode/medledger/` and is written in Go, per `docs/design.md` §6.
 
-Naming conventions:
-- `snake_case` for functions, variables, and modules.
-- `PascalCase` for classes.
-- `UPPER_SNAKE_CASE` for constants.
-- Prefix private helpers with `_`.
+- Code MUST be `gofmt`-formatted; no unformatted file may be committed.
+- Naming follows idiomatic Go: `MixedCaps`/`mixedCaps` (no underscores), exported identifiers
+  capitalized only when part of the package's public API.
+- Package layout follows `docs/design.md` §9: `contracts/`, `models/`, `rules/`, `utils/`.
+- Every returned error MUST be checked; wrap with context using `fmt.Errorf("...: %w", err)`.
+  Never discard an error with `_` outside of deferred `Close()`-style calls.
+- No package-level mutable state.
 
-Imports MUST be grouped in this order, separated by a blank line:
-1. Standard library
-2. Third-party
-3. Local
+### II. Coding Standards — JavaScript (API Gateway & Web UI) (NON-NEGOTIABLE)
 
-Use descriptive names. Avoid single-letter variables except simple loop counters (`i`, `j`).
+The API gateway (`api/`) and web UI (`web/`) are plain JavaScript (ES2022+), per
+`docs/design.md` §6 — no TypeScript build step, to keep the stack simple for this project's
+short lifespan.
 
-### II. Quality Gates (NON-NEGOTIABLE)
+- Code MUST be Prettier-formatted and ESLint-clean (recommended config).
+- `camelCase` for variables/functions, `PascalCase` for React components and classes,
+  `UPPER_SNAKE_CASE` for constants.
+- `async`/`await` only; every promise chain MUST have error handling — no unhandled rejections.
+- React components are functional and hook-based; no class components.
+
+### III. Chaincode Determinism (NON-NEGOTIABLE — FABRIC-SPECIFIC)
+
+Endorsing peers execute chaincode independently and MUST produce identical read/write sets, or
+the transaction fails validation (`docs/spec.md` NFR-7). This principle is therefore stricter
+than ordinary code quality — a violation causes a working-looking transaction to fail at commit.
+
+- NEVER call `time.Now()`, `math/rand`, or `os.Getenv` inside a state-mutating chaincode
+  function. Use `ctx.GetStub().GetTxTimestamp()` exclusively for time.
+- `GetQueryResult` (CouchDB rich queries) is permitted only in read-only query functions —
+  never in a function that also calls `PutState`.
+- Before merging any chaincode change, run:
+  ```
+  grep -rn "time.Now()\|rand\.\|os.Getenv\|math/rand\|GetQueryResult" chaincode/
+  ```
+  and confirm every hit is inside a read-only query function.
+
+### IV. Quality Gates (NON-NEGOTIABLE)
 
 Every implementation MUST satisfy all of the following before a task is considered complete:
 
-- Zero `pylint` warnings (configuration in `qa_tools/static_analysis/pylintrc`).
-- Zero `mypy` errors (configuration in `qa_tools/static_analysis/mypy_config`).
-- All unit tests passing (verified via `qa_tools/check_sanity.sh`).
-- Build succeeds via `build_scripts/build.sh`.
+Go (`chaincode/`):
+- `gofmt -l .` reports no files.
+- `go vet ./...` is clean.
+- `golangci-lint run` reports zero warnings.
+- `go test ./...` passes in full.
+
+JavaScript (`api/`, `web/`):
+- `npm run lint` (ESLint) reports zero errors.
+- `npm test` (Jest) passes in full.
 
 No merge is permitted while any gate is red.
 
-### III. Testing Principles
+### V. Testing Principles
 
 Every code change MUST include tests covering:
 
 - Happy path — expected successful behaviour.
-- Error path — failure and exception handling.
+- Error path — rejection and failure handling.
 - Edge cases — boundary values and unusual inputs.
 - Empty / malformed input — robustness under bad data.
 
 Additional requirements:
-- New CLI options require component tests.
+- Chaincode: table-driven Go tests using `testify` with a mocked `ChaincodeStub`
+  (`docs/plan.md` §4.5), covering every fraud rule (R1–R7) and every derived status value.
+- API: Jest tests for each route, including role-rejection cases (doctor calling a
+  pharmacist-only endpoint and vice versa).
 - Every new code path MUST be exercised by at least one test.
-- Branch coverage is preferred over simple line coverage.
 
-### IV. Refactoring Principles
+### VI. Refactoring Principles
 
 Modified code MUST be continuously evaluated for:
 
@@ -68,31 +104,24 @@ Modified code MUST be continuously evaluated for:
 Refactoring opportunities identified during implementation MUST be reported,
 even when not immediately addressed.
 
-### V. Assertive Programming
+### VII. Assertive Programming
 
-- Validate all inputs at system boundaries, immediately and explicitly.
-- Validate configuration on startup before any processing begins.
+- Validate all inputs at system boundaries: chaincode function arguments, transient data
+  fields, and API request bodies — immediately and explicitly.
+- Enforce role/MSP checks (`RequireRole`) at the top of every chaincode function, before any
+  state read or write.
 - Validate HTTP/external responses before consuming them.
-- Raise specific, descriptive exceptions — never `Exception` bare.
-- Never silently swallow exceptions.
-- Use `assert` only for internal invariants that MUST never be false in correct code.
+- Raise specific, descriptive errors — never a bare `Error`/`Exception`.
+- Never silently swallow errors.
 
-### VI. SOLID
+### VIII. SOLID & Design Principles
 
-- **Single Responsibility**: Every module, class, and function has exactly one reason to change.
+- **Single Responsibility**: Every module, contract, and function has exactly one reason to
+  change (e.g. fraud rules live in `rules/`, never inline in contract handlers).
 - **Open/Closed**: Extend behaviour via new code; avoid modifying stable, tested code.
-- **Liskov Substitution**: Subtypes MUST be substitutable for their base types without altering
-  correctness.
-- **Interface Segregation**: Clients MUST NOT be forced to depend on interfaces they do not use;
-  prefer narrow, focused abstractions.
-- **Dependency Inversion**: High-level modules MUST NOT depend on low-level modules; both MUST
-  depend on abstractions.
-
-### VII. Design Principles
-
-- Prefer factory functions over direct constructors where creation logic is non-trivial.
-- Use the Command pattern for CLI dispatch.
-- Avoid God classes — no class should own too many responsibilities.
+- **Dependency Inversion**: Contracts depend on the `ChaincodeStub`/context interface, never on
+  concrete peer/network details, to keep them testable with a mock stub.
+- Avoid God objects — no contract or route module should own too many responsibilities.
 - Do not introduce patterns unless they demonstrably simplify maintenance.
 
 ## Code Quality
@@ -103,38 +132,47 @@ The following are prohibited and MUST be corrected before completion:
 
 - Duplicate code (DRY violation).
 - Dead code (unreachable or unused).
-- Magic numbers or magic strings (extract to named constants).
+- Magic numbers or magic strings (extract to named constants — e.g. rule IDs `R1`–`R7`).
 - Long functions exceeding a single screen of logic.
 - Happy-path-only testing.
 
 ### Logging Policy
 
-- Use the standard `logging` module; NEVER use `print` for diagnostics.
-- Apply appropriate log levels: `DEBUG` for trace detail, `INFO` for lifecycle events,
-  `WARNING` for recoverable anomalies, `ERROR`/`CRITICAL` for failures.
-- Never log credentials, tokens, passwords, or other sensitive values.
-- Include sufficient diagnostic context (e.g. entity IDs, operation names) so failures are
+- Go: use the standard `log` package (or the chaincode shim's logger); never `fmt.Println` for
+  diagnostics.
+- JavaScript: use `console` with explicit levels via a thin wrapper; never leave ad-hoc debug
+  `console.log` calls in committed code.
+- Apply appropriate levels: debug/trace detail, lifecycle events, recoverable anomalies, and
+  failures MUST be distinguishable.
+- NEVER log credentials, private keys, JWTs, or patient-identifying data (name, DOB, patient
+  reference number) — only their hashes or identifiers.
+- Include sufficient diagnostic context (prescription ID, MSP ID, rule ID) so failures are
   actionable without a debugger.
 
 ## Security
 
-- Treat ALL external inputs (CLI arguments, environment variables, network
-  responses) as untrusted; validate before use.
-- Never expose secrets, keys, or credentials in source code, logs, or error messages.
-- Use HTTPS exclusively for any external service communication.
-- Follow OWASP Top 10 guidance; review every new code path for injection vulnerabilities
-  (command injection, path traversal etc).
-- Dependency updates MUST be evaluated for known CVEs before adoption.
+- Treat ALL external inputs (HTTP request bodies, chaincode arguments, transient data) as
+  untrusted; validate before use.
+- Never expose secrets, private keys, wallet credentials, or patient-identifying data in source
+  code, logs, or error messages.
+- Use TLS for all Fabric peer/orderer/gateway connections and HTTPS for the REST API.
+- Fraud rules and role checks MUST be enforced in chaincode, never only in the API layer — the
+  API layer is convenience, not the security boundary (`docs/design.md` §3.2).
+- Patient-identifying fields MUST be sent as transient data, never as ordinary chaincode
+  arguments, and stored only in the private data collection (`docs/spec.md` FR-7).
+- Follow OWASP Top 10 guidance; review every new code path for injection vulnerabilities.
+- Dependency updates (Go modules, npm packages) MUST be evaluated for known CVEs before adoption.
 
 ## Non-functional Requirements
 
-Every implementation MUST consider the following dimensions:
+Every implementation MUST consider the following dimensions, per `docs/spec.md` §6:
 
-- **Reliability**: Failures MUST be handled gracefully with clear error reporting; the tool
-  MUST never corrupt data on partial failure.
-- **Performance**: GET and POST APIs should perform better. DB operations should perform better.
-- **Scalability**: Design choices MUST not prevent future support or
-  high-volume import pipelines.
+- **Reliability**: Chaincode failures MUST reject cleanly with a specific rule ID; no partial
+  writes on failure (Fabric's simulate/endorse/commit model already guarantees atomicity per
+  transaction — do not work around it).
+- **Performance**: Transaction commit under 5s, queries under 500ms on demo hardware.
+- **Scalability**: Design choices MUST not prevent adding organizations or drug-schedule rules
+  without a data-model rewrite.
 
 ## Governance
 
@@ -151,4 +189,4 @@ Amendment procedure:
 All pull requests MUST verify compliance with every principle herein before merging.
 Complexity or deviation from these principles MUST be explicitly justified in the PR description.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-15
+**Version**: 2.0.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-15
