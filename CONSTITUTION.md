@@ -8,7 +8,7 @@ Removed sections: n/a (first ratification of template)
 TODOs           : none — all placeholders resolved
 -->
 
-# kinsync-api Constitution
+# medledger Constitution
 
 ## Core Principles
 
@@ -138,7 +138,7 @@ Every implementation MUST consider the following dimensions:
 
 ## Governance
 
-This constitution supersedes all other practices and guidelines within the `kinsync-api` project.
+This constitution supersedes all other practices and guidelines within the `medledger` project.
 
 Amendment procedure:
 1. Propose a change with a written rationale.
