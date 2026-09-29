@@ -1,17 +1,17 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change  : 1.0.0 → 2.0.0
-Rationale       : Project stack corrected from Python to Go (chaincode) + JavaScript
-                  (API gateway, web UI), matching docs/spec.md, docs/design.md, docs/plan.md.
-                  This is a full redefinition of the Coding Standards and Quality Gates
-                  principles (MAJOR per own amendment rule), plus a new Fabric-specific
-                  determinism principle.
-Added sections  : Core Principles III (Chaincode Determinism)
-Changed sections: Core Principles I–II (Go/JS coding standards replace PEP 8), Quality Gates,
-                  Testing Principles, Assertive Programming, Logging Policy, Security
-Removed sections: Python-specific tooling references (pylint, mypy, qa_tools/, build_scripts/)
-TODOs           : none — all placeholders resolved
+Version change  : 2.0.0 → 2.1.0
+Rationale       : Demo-project simplification. The REST API and web UI may be served over
+                  plain HTTP when bound to localhost only (docs/spec.md X7). Fabric TLS is
+                  unchanged. Reference data must be embedded, not read at runtime.
+                  MINOR per own amendment rule (new guidance, no principle removed).
+Added sections  : Demo Simplification (under Governance)
+Changed sections: Security (HTTPS rule), Core Principles III (os.ReadFile / go:embed)
+Removed sections: none
+TODOs           : none
+
+Previous        : 1.0.0 → 2.0.0 — stack corrected from Python to Go + JavaScript.
 -->
 
 # medledger Constitution
@@ -50,11 +50,13 @@ than ordinary code quality — a violation causes a working-looking transaction 
 
 - NEVER call `time.Now()`, `math/rand`, or `os.Getenv` inside a state-mutating chaincode
   function. Use `ctx.GetStub().GetTxTimestamp()` exclusively for time.
+- Reference data (the jurisdiction profile) MUST be compiled in with `//go:embed`, never read
+  with `os.ReadFile` or from the environment at runtime.
 - `GetQueryResult` (CouchDB rich queries) is permitted only in read-only query functions —
   never in a function that also calls `PutState`.
 - Before merging any chaincode change, run:
   ```
-  grep -rn "time.Now()\|rand\.\|os.Getenv\|math/rand\|GetQueryResult" chaincode/
+  grep -rn "time.Now()\|rand\.\|os.Getenv\|os.ReadFile\|math/rand\|GetQueryResult" chaincode/
   ```
   and confirm every hit is inside a read-only query function.
 
@@ -153,9 +155,11 @@ The following are prohibited and MUST be corrected before completion:
 
 - Treat ALL external inputs (HTTP request bodies, chaincode arguments, transient data) as
   untrusted; validate before use.
-- Never expose secrets, private keys, wallet credentials, or patient-identifying data in source
+- Never expose secrets, private keys, identity private keys, or patient-identifying data in source
   code, logs, or error messages.
-- Use TLS for all Fabric peer/orderer/gateway connections and HTTPS for the REST API.
+- Use TLS for all Fabric peer/orderer/CA/gateway connections. The REST API and web UI MAY use
+  plain HTTP, provided they listen on `localhost`/`127.0.0.1` only (demo scope,
+  `docs/spec.md` X7). Any exposure beyond localhost requires HTTPS.
 - Fraud rules and role checks MUST be enforced in chaincode, never only in the API layer — the
   API layer is convenience, not the security boundary (`docs/design.md` §3.2).
 - Patient-identifying fields MUST be sent as transient data, never as ordinary chaincode
@@ -186,7 +190,14 @@ Amendment procedure:
 3. Update `LAST_AMENDED_DATE` to today's date in ISO 8601 format (YYYY-MM-DD).
 4. Commit with message: `docs: amend constitution to vX.Y.Z (<summary>)`.
 
+### Demo Simplification
+
+MedLedger is a demonstration project. Where a simpler approach does not weaken the
+fraud-prevention properties (chaincode-enforced rules, cross-org endorsement, immutability,
+private patient data, determinism), prefer the simpler approach and record the trade-off in
+`docs/spec.md` §3.2 (Out of Scope).
+
 All pull requests MUST verify compliance with every principle herein before merging.
 Complexity or deviation from these principles MUST be explicitly justified in the PR description.
 
-**Version**: 2.0.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-15
+**Version**: 2.1.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-29

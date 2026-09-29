@@ -14,7 +14,7 @@ Fabric binaries and images are **not** committed. From the repo root:
 ```bash
 curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
 chmod +x install-fabric.sh
-./install-fabric.sh --fabric-version 2.5.9 binary docker
+./install-fabric.sh --fabric-version 2.5.16 --ca-version 1.5.22 binary docker
 docker pull couchdb:3.3.3
 export PATH="$PWD/bin:$PATH"
 ```

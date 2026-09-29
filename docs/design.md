@@ -14,7 +14,7 @@ The architecture is layered:
 | Layer | Responsibility |
 |---|---|
 | **Presentation** | Role-specific web UI (doctor, pharmacist, regulator) |
-| **Application** | REST API gateway; identity wallet management; transaction submission |
+| **Application** | REST API gateway; identity (cert + key) management; transaction submission |
 | **Smart contract** | Chaincode enforcing all business and fraud rules |
 | **Ledger** | Immutable blockchain + world state per peer |
 | **Network** | Peers, ordering service, CAs, channel configuration |
@@ -32,7 +32,7 @@ graph TB
     subgraph MedLedger["MedLedger System"]
         UI[Web UI]
         API[REST API Gateway]
-        SDK[Fabric SDK + Wallet]
+        SDK[Fabric Gateway + identities]
         CC[Chaincode]
         NET[(Fabric Network)]
     end
@@ -114,6 +114,29 @@ AND(
 
 **Rationale:** Every state-changing transaction requires agreement from both sides of the trust boundary. A hospital cannot commit a prescription without a pharmacy independently validating it, and a pharmacy cannot commit a fulfillment without a hospital peer independently confirming the underlying prescription and fraud rules. This is the structural property that makes unilateral fraud impossible.
 
+> The `.peer` role in this policy only resolves when **NodeOUs** are enabled for every org (`EnableNodeOUs: true` in `crypto-config.yaml`, which writes `msp/config.yaml`). Without NodeOUs every endorsement fails the policy.
+
+### 2.3 Identity Architecture
+
+Two tools issue certificates, and they must share one root of trust per organization:
+
+| Identity | Issued by | Why |
+|---|---|---|
+| Peers, orderers, org admins | `cryptogen` (Phase 1) | Static, generated before any container runs |
+| Doctors, pharmacists, auditor | Fabric CA (Phase 3) | Needs the `role` attribute embedded in the certificate |
+
+Each org's `fabric-ca-server` is started **with that org's cryptogen CA certificate and private key** (`FABRIC_CA_SERVER_CA_CERTFILE` / `FABRIC_CA_SERVER_CA_KEYFILE` → `organizations/peerOrganizations/<org>/ca/`). User certificates therefore chain to the same root that the channel configuration lists in the org's MSP, and the network accepts them as members.
+
+> If the CA instead generated its own root, every enrolled user would be rejected as an unknown identity — the channel only trusts the roots in its MSP definitions.
+
+### 2.4 Channel Creation
+
+Fabric 2.5 creates channels through the **channel participation API**; there is no orderer system channel (it is deprecated in 2.x and removed in 3.x):
+
+1. `configtxgen -outputBlock` writes the genesis block of `prescription-channel` directly, including each org's anchor peer.
+2. `osnadmin channel join` hands that block to each orderer (orderers start with `ORDERER_GENERAL_BOOTSTRAPMETHOD=none`).
+3. `peer channel join -b` joins each peer.
+
 ---
 
 ## 3. High-Level Design
@@ -129,8 +152,8 @@ graph TB
     subgraph App["Application Tier - Node.js"]
         REST[Express REST API]
         AUTH[Auth Middleware<br/>JWT to Fabric identity]
-        WALLET[Filesystem Wallet]
-        GW[Fabric Gateway Client]
+        WALLET[Identity Store<br/>cert + key files]
+        GW[Fabric Gateway Client<br/>one connection per org peer]
     end
 
     subgraph Chain["Chaincode Tier"]
@@ -138,6 +161,7 @@ graph TB
         FC[FulfillmentContract]
         QC[QueryContract]
         FR[FraudRules module]
+        REF[Jurisdiction profile<br/>embedded reference data]
         UT[Utils: keys, hashing, time]
     end
 
@@ -156,6 +180,8 @@ graph TB
     GW --> QC
     PC --> FR
     FC --> FR
+    FR --> REF
+    PC --> REF
     PC --> UT
     FC --> UT
     QC --> UT
@@ -172,7 +198,7 @@ graph TB
 |---|---|---|
 | Web UI | Render role-appropriate forms and views | Contain business rules |
 | REST API | Map HTTP to chaincode invocations, manage sessions | Validate fraud rules |
-| Wallet | Store and retrieve X.509 identities | Generate identities at request time |
+| Identity store | Load each enrolled user's X.509 certificate and private key from its MSP directory (`@hyperledger/fabric-gateway` has no wallet object) | Generate identities at request time |
 | Chaincode | Enforce **all** business and fraud rules | Perform non-deterministic operations |
 | World State | Serve current-value queries | Be treated as authoritative over the blockchain |
 
@@ -191,7 +217,7 @@ Composite keys allow prefix-range queries without relying on CouchDB indexes for
 | Prescription | `PRESC~{prescriptionId}` | `PRESC~a3f1c9e2-...` |
 | Fulfillment | `FULFILL~{prescriptionId}~{sequence}` | `FULFILL~a3f1c9e2-...~0` |
 | Revocation | `REVOKE~{prescriptionId}` | `REVOKE~a3f1c9e2-...` |
-| Doctor index | `DOCIDX~{doctorId}~{prescriptionId}` | For "my prescriptions" queries |
+| Doctor index | `DOCIDX~{doctorMSP}~{doctorId}~{prescriptionId}` | For "my prescriptions" queries; MSP included because common names are unique only within an org |
 
 Retrieving all fulfillments for a prescription is a partial composite key range query on `FULFILL~{prescriptionId}~`, which is deterministic and index-free.
 
@@ -210,7 +236,7 @@ erDiagram
         string doctorMSP
         string drugCode
         string drugName
-        string deaSchedule
+        string controlClass
         number quantity
         string dosageInstructions
         number refillsAllowed
@@ -234,6 +260,7 @@ erDiagram
         string revocationId PK
         string prescriptionId FK
         string revokedBy
+        string revokedByMSP
         string reason
         string revokedAt
         string docType
@@ -244,6 +271,7 @@ erDiagram
         string patientName
         string patientDOB
         string patientRef
+        string salt
     }
 ```
 
@@ -253,9 +281,10 @@ erDiagram
 
 ```
 // PrescriptionContract
-IssuePrescription(ctx, prescriptionId, drugCode, drugName, deaSchedule,
+IssuePrescription(ctx, prescriptionId, drugCode,
                   quantity, dosageInstructions, refillsAllowed, validityDays)
-    → transient map carries: patientName, patientDOB, patientRef
+    → drugName and controlClass are looked up from the jurisdiction profile
+    → transient map carries: patientName, patientDOB, patientRef, salt
 RevokePrescription(ctx, prescriptionId, reason)
 ReadPrescription(ctx, prescriptionId)
 ReadPatientData(ctx, prescriptionId)              // private collection
@@ -267,9 +296,12 @@ GetFulfillments(ctx, prescriptionId)
 // QueryContract
 GetPrescriptionStatus(ctx, prescriptionId)        // derived, never stored
 GetPrescriptionHistory(ctx, prescriptionId)       // full tx history, audit
-GetPrescriptionsByDoctor(ctx, doctorId)
+GetPrescriptionsByDoctor(ctx, doctorMSP, doctorId)
 CheckFulfillmentEligibility(ctx, prescriptionId, quantityRequested)
+GetDrugReference(ctx)                              // jurisdiction profile, for UI dropdowns
 ```
+
+`GetPrescriptionHistory` returns what `GetHistoryForKey` provides — transaction ID, timestamp, value per write. Endorsing organizations are not part of key history; the API reads them per transaction ID from the `qscc` system chaincode (`GetTransactionByID`) for the regulator view.
 
 Patient-identifying fields are passed via the **transient data map**, not as ordinary arguments. Ordinary arguments are written into the transaction proposal and therefore onto the blockchain of every org; transient data is not.
 
@@ -318,12 +350,25 @@ flowchart TD
     F -->|No| V[REJECT: R1 limit reached]
     F -->|Yes| G{quantityDispensed<br/>≤ quantity?}
     G -->|No| U[REJECT: R2 overrun]
-    G -->|Yes| H{Last fulfillment<br/>outside refill interval?}
-    H -->|No| T[REJECT: R4 early refill]
-    H -->|Yes| I{Different pharmacy<br/>within window?}
+    G -->|Yes| H{Same pharmacy filled<br/>within refill interval?}
+    H -->|Yes| T[REJECT: R4 early refill]
+    H -->|No| I{Different pharmacy filled<br/>within refill interval?}
     I -->|Yes| S[REJECT: R7 cross-pharmacy]
     I -->|No| J[Append fulfillment record]
     J --> K[COMMIT]
+```
+
+The refill interval is the control class's `minRefillIntervalDays` (§4.6), measured against the most recent fulfillment. R4 and R7 split on whether that fulfillment came from the caller's pharmacy MSP, so both are reachable. Because R1 runs first, a duplicate fill on a **zero-refill** prescription always reports R1, even across pharmacies; R7 is observed only on prescriptions with refills remaining.
+
+### 4.6 Jurisdiction Profile
+
+The profile (control classes with `maxRefills` / `minRefillIntervalDays`, plus the drug reference list — `spec.md` §7.5) lives in `chaincode/medledger/reference/profile.json` and is compiled in with Go's `//go:embed`. It is never read from the peer filesystem or environment at runtime (NFR-7): every peer runs the identical embedded bytes. The India profile is the default; a different country is a different `profile.json` and a chaincode upgrade.
+
+```mermaid
+graph LR
+    PJ[reference/profile.json<br/>India demo data] -->|go:embed| RF[reference package]
+    RF --> ISS[IssuePrescription<br/>lookup drug, R6]
+    RF --> FUL[RecordFulfillment<br/>R4 / R7 interval]
 ```
 
 ---
@@ -348,7 +393,7 @@ sequenceDiagram
     GW->>PP: Transaction proposal
 
     HP->>HP: Verify role = doctor
-    HP->>HP: Validate DEA schedule rules
+    HP->>HP: Look up drug, enforce control-class limit (R6)
     HP->>HP: Simulate: write prescription + private data
     HP-->>GW: Endorsement + read/write set
 
@@ -442,23 +487,35 @@ sequenceDiagram
 
 | Layer | Technology | Version target | Rationale |
 |---|---|---|---|
-| Blockchain framework | Hyperledger Fabric | 2.5 LTS | Permissioned, pluggable consensus, private data support |
+| Blockchain framework | Hyperledger Fabric | 2.5.16 (2.5 LTS line) | Permissioned, pluggable consensus, private data support |
 | Consensus | Raft (etcdraft) | Built-in | Crash-fault tolerant, production default for Fabric 2.x |
-| Chaincode language | **Go** | 1.21+ | Best-supported chaincode language; strong typing catches determinism bugs at compile time |
-| Chaincode SDK | `fabric-contract-api-go` | Latest | Official contract API |
-| State database | CouchDB | 3.3 | Rich JSON queries for audit views |
-| Application runtime | Node.js | 20 LTS | Mature Fabric Gateway SDK |
-| Application SDK | `@hyperledger/fabric-gateway` | 1.4+ | Modern gateway API, replaces legacy `fabric-network` |
-| REST framework | Express | 4.x | Minimal, well-understood |
-| Web UI | React + Vite | 18 / 5 | Fast dev loop |
-| UI styling | Tailwind CSS | 3.x | Rapid role-specific layouts |
+| Channel capabilities | Channel / Orderer / Application | `V2_0` / `V2_0` / `V2_5` | Application `V2_5` enables 2.5 features (e.g. private data purge) |
+| Chaincode language | **Go** | `go 1.22` in `go.mod` | Best-supported chaincode language; strong typing catches determinism bugs at compile time |
+| Chaincode SDK | `fabric-contract-api-go/v2` | 2.2.x | Official contract API |
+| State database | CouchDB | 3.3.3 | Rich JSON queries for audit views; version paired with Fabric 2.5 samples |
+| Application runtime | Node.js | 22 LTS | Supported until April 2027 (Node 20 reached end of life April 2026) |
+| Application SDK | `@hyperledger/fabric-gateway` | 1.12+ | Modern gateway API, replaces legacy `fabric-network` |
+| REST framework | Express | 5.x | Minimal, well-understood; native async error handling |
+| Web UI | React + Vite | 19 / 8 | Fast dev loop |
+| UI styling | Tailwind CSS | 4.x (`@tailwindcss/vite`) | Rapid role-specific layouts; no PostCSS config |
 | Containerization | Docker + Docker Compose | 24+ / v2 | Standard Fabric test-network approach |
-| Certificate authority | Fabric CA | 1.5+ | Per-org identity issuance |
-| Testing | Go `testing` + `testify`; Jest for API | — | Unit tests for chaincode rules |
+| Certificate authority | Fabric CA | 1.5.22 | Per-org identity issuance |
+| Testing | Go `testing` + `testify`; Jest 30 for API | — | Unit tests for chaincode rules |
+
+> **Go version pinning.** Peers compile Go chaincode inside the `hyperledger/fabric-ccenv:2.5.16` image (Go 1.26.4), not with the host's Go. The `go` directive in `go.mod` must never exceed that image's Go version (check with `docker run --rm hyperledger/fabric-ccenv:2.5.16 go version`). `go mod init` writes the *host* version, so pin it explicitly to the minimum the dependencies need — `go mod edit -go=1.22` — which keeps any host Go ≥ 1.22 and any future ccenv working.
 
 ### 6.1 Language Choice Note
 
-Chaincode is specified in **Go** rather than JavaScript. Fabric's Go contract API is the most mature, and Go's explicit error handling and absence of implicit type coercion reduce the risk of non-deterministic endorsement failures (NFR-7). The application tier remains Node.js, so the project is bilingual: Go for the contract, TypeScript/JavaScript for everything above it.
+Chaincode is specified in **Go** rather than JavaScript. Fabric's Go contract API is the most mature, and Go's explicit error handling and absence of implicit type coercion reduce the risk of non-deterministic endorsement failures (NFR-7). The application tier is plain JavaScript on Node.js (no TypeScript build step, per `CONSTITUTION.md`), so the project is bilingual: Go for the contract, JavaScript for everything above it.
+
+### 6.2 Supported Demo Hosts
+
+| Host | Docker | Notes |
+|---|---|---|
+| openSUSE Leap 16.0 | Docker Engine from the distro repos | Leap 16 defaults to **SELinux** on fresh installs. If `docker info` lists `selinux` under security options, bind mounts need the `:z` suffix and peers need `security_opt: [label=disable]` to use the Docker socket. Systems using AppArmor need neither. |
+| Ubuntu 24.04 on Windows 11 WSL2 | Docker Desktop (WSL integration) **or** Docker Engine installed inside WSL | Clone the repo inside the Linux filesystem (`~/…`), never under `/mnt/c` (slow, loses exec bits). `.gitattributes` forces LF on `*.sh`. WSL defaults to half the host RAM (8 GB on a 16 GB machine), which is sufficient; raise it via `%UserProfile%\.wslconfig` if needed. Ports published on `127.0.0.1` in WSL are reachable from Windows browsers. |
+
+Fabric binaries and images are `linux/amd64` and identical on both hosts; the scripts use only `bash`, `jq`, `curl`, and Docker, so no host-specific branches are needed.
 
 ---
 
@@ -471,11 +528,11 @@ graph LR
     end
 
     subgraph Private["patientDataCollection — hospitals + pharmacies only"]
-        PRIV[patientName: Jane Doe<br/>patientDOB: 1985-03-12<br/>patientRef: PT-4471]
+        PRIV[patientName: Priya Sharma<br/>patientDOB: 1985-03-12<br/>patientRef: PT-4471<br/>salt: 3c9e...]
     end
 
     subgraph Excluded["Regulator peer"]
-        EX[Sees hash only<br/>Cannot read names]
+        EX[Sees hash only<br/>Cannot read or guess names]
     end
 
     PRIV -.->|SHA-256| PUB
@@ -496,6 +553,8 @@ graph LR
 
 The hash on the public ledger still provides tamper evidence: anyone can verify that private data matching a given hash existed at a given block height, without seeing its contents.
 
+**Why the salt.** Names and birth dates have low entropy; an unsalted SHA-256 of them could be reversed by hashing candidate combinations. The API generates a random 32-byte salt per prescription (Node `crypto.randomBytes`) and sends it in the transient map. Chaincode rejects a missing or short salt but does **not** generate one — randomness inside chaincode would break determinism (NFR-7). The hash is computed over the canonical JSON of the private payload (fields in the fixed order of `spec.md` §7.4).
+
 ---
 
 ## 8. Deployment Architecture
@@ -504,9 +563,9 @@ The hash on the public ledger still provides tamper evidence: anyone can verify 
 graph TB
     subgraph Host["Single Demo Host — Docker Compose"]
         subgraph Net["Docker network: medledger"]
-            O1[orderer1:7050]
-            O2[orderer2:8050]
-            O3[orderer3:9050]
+            O1[orderer1:7050<br/>admin 7053]
+            O2[orderer2:8050<br/>admin 8053]
+            O3[orderer3:9050<br/>admin 9053]
 
             PA[peer0.hospitala:7051]
             PB[peer0.hospitalb:8051]
@@ -544,9 +603,20 @@ graph TB
     PR --- O3
 
     API --> PA
+    API --> PB
     API --> PX
+    API --> PY
+    API --> PR
     WEB --> API
 ```
+
+**Deployment notes**
+
+- The API opens one gRPC connection per org peer and submits each user's transactions through **their own org's peer**, as Fabric Gateway expects. The gateway peer then collects the other endorsements the policy needs.
+- Every published port binds to `127.0.0.1` (e.g. `"127.0.0.1:5984:5984"`); nothing is exposed beyond the demo host.
+- Peers mount `/var/run/docker.sock` so they can build and launch chaincode containers.
+- Each `ca.<org>` container mounts its org's cryptogen `ca/` directory and uses it as its signing root (§2.3).
+- Orderers start with `ORDERER_GENERAL_BOOTSTRAPMETHOD=none` and `ORDERER_CHANNELPARTICIPATION_ENABLED=true`; ports 7053/8053/9053 serve the `osnadmin` admin API over mutual TLS.
 
 ---
 
@@ -587,6 +657,9 @@ medledger/
 │       │   └── revocation.go
 │       ├── rules/
 │       │   └── fraud.go
+│       ├── reference/
+│       │   ├── profile.go          # go:embed loader
+│       │   └── profile.json        # jurisdiction profile (India default)
 │       ├── utils/
 │       │   ├── keys.go
 │       │   ├── identity.go
@@ -597,7 +670,7 @@ medledger/
 │   ├── src/
 │   │   ├── server.js
 │   │   ├── gateway.js
-│   │   ├── wallet.js
+│   │   ├── identities.js
 │   │   ├── middleware/auth.js
 │   │   └── routes/
 │   │       ├── prescriptions.js
@@ -631,5 +704,10 @@ medledger/
 | D6 | Composite keys with range queries | CouchDB rich queries for core paths | Rich queries are not re-executed deterministically during validation |
 | D7 | Fraud rules only in chaincode | Duplicated in API as enforcement | API can be bypassed by direct chaincode invocation |
 | D8 | Regulator excluded from private collection | Regulator included | Demonstrates data minimization; regulator can be granted access via governance if needed |
+| D9 | Fabric CA signs with the cryptogen CA key per org | Separate CA roots; or Fabric CA for all identities | One root of trust per org with the least setup; cryptogen stays for static node identities |
+| D10 | Channel participation API (`osnadmin`) | Orderer system channel | System channel is deprecated in 2.5 and removed in 3.x |
+| D11 | Generic control classes + embedded jurisdiction profile (India default) | Hard-coded US DEA schedules | Same rules serve any country; profile changes go through chaincode-upgrade governance |
+| D12 | API-generated salt in private payload | Plain hash of patient fields | Prevents dictionary reversal of the public hash; randomness stays out of chaincode |
+| D13 | R4/R7 split by same vs. different pharmacy | Two overlapping time windows | Makes both rules reachable and gives pharmacy shopping its own rule ID |
 
 > **On D6:** CouchDB rich queries (`GetQueryResult`) are evaluated during simulation but **not** re-evaluated at validation time, so results can be stale by commit time. They are safe for read-only query functions, and unsafe inside functions that write state based on their results. Core fraud checks therefore use deterministic composite-key range queries.
