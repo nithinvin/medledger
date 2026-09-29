@@ -555,15 +555,19 @@ graph TB
 ```
 medledger/
 ├── README.md
-├── spec.md
-├── design.md
-├── plan.md
+├── CONSTITUTION.md
+├── run-demo.sh
+├── docs/
+│   ├── spec.md
+│   ├── design.md
+│   └── plan.md
 ├── network/
 │   ├── docker-compose.yaml
 │   ├── configtx.yaml
 │   ├── crypto-config.yaml
 │   ├── collections_config.json
 │   └── scripts/
+│       ├── generateArtifacts.sh
 │       ├── up.sh
 │       ├── down.sh
 │       ├── createChannel.sh

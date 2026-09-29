@@ -30,3 +30,28 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# --- Hyperledger Fabric downloads (install-fabric.sh output; re-download, never commit) ---
+/install-fabric.sh
+/bin/
+/builders/
+/config/
+
+# --- Generated Fabric network material (contains private keys) ---
+network/organizations/
+network/channel-artifacts/
+network/*.block
+network/*.tx
+*.tar.gz
+
+# --- Identities / wallets (private keys) ---
+wallet/
+api/wallet/
+
+# --- Node.js ---
+node_modules/
+dist/
+.vite/
+
+# --- Logs ---
+*.log
