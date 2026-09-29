@@ -25,7 +25,7 @@ This is a demo project: where a simpler approach does not weaken the fraud-preve
 
 1. Install prerequisites:
    - Docker Engine 24+ and Docker Compose v2 (on WSL: Docker Desktop with WSL integration, or Docker Engine installed inside the Ubuntu distro)
-   - Go 1.22+ (host toolchain for unit tests; chaincode itself is compiled inside `fabric-ccenv`)
+   - Go 1.24+ (host toolchain for unit tests; chaincode itself is compiled inside `fabric-ccenv`)
    - Node.js 22 LTS
    - `jq`, `curl`, `git`
    - On WSL: clone the repository under `~/`, not `/mnt/c`
@@ -41,11 +41,11 @@ This is a demo project: where a simpler approach does not weaken the fraud-preve
    ```
 4. Add `bin/` to `PATH`; confirm `peer version` and `fabric-ca-client version` respond.
 5. Create the repository structure exactly as specified in `design.md` §9.
-6. Initialize `chaincode/medledger/go.mod` with module path `github.com/<org>/medledger/chaincode`, then pin the language version to what `fabric-ccenv:2.5.16` can build (`design.md` §6):
+6. Initialize `chaincode/medledger/go.mod` with module path `github.com/nithinvin/medledger/chaincode`, pinning the contract API to a release whose Go requirement `fabric-ccenv:2.5.16` (Go 1.26.4) can build (`design.md` §6):
    ```
-   go mod init github.com/<org>/medledger/chaincode
-   go mod edit -go=1.22
-   go get github.com/hyperledger/fabric-contract-api-go/v2@latest
+   go mod init github.com/nithinvin/medledger/chaincode
+   go get github.com/hyperledger/fabric-contract-api-go/v2@v2.2.1   # not @latest: v2.2.3 needs Go 1.26.7
+   go mod edit -go=1.24.0 -toolchain=none
    ```
 7. Initialize `api/package.json` and `web/package.json`.
 8. Commit the skeleton. `.gitignore` must cover the Fabric downloads (`/bin/`, `/builders/`, `/config/`, `/install-fabric.sh`), `node_modules/`, `network/organizations/`, `network/channel-artifacts/`, `*.tar.gz`, and `*.log`.
@@ -499,7 +499,7 @@ Chaincode containers (`dev-peer*`) survive a normal Compose teardown and will se
 | Non-deterministic chaincode causes endorsement mismatch | Medium | High | Phase 4.6 determinism grep; use `GetTxTimestamp()` exclusively; reference data via `go:embed` |
 | Role attribute missing from certificate | Medium | High | Phase 3 openssl verification before proceeding |
 | Fabric CA users not trusted by channel | Medium | High | CA signs with cryptogen root (`design.md` §2.3); Phase 3 `openssl verify` |
-| `go.mod` newer than `fabric-ccenv` Go | Low | Medium | Pin `go 1.22` (Phase 0 step 6) |
+| `go.mod` newer than `fabric-ccenv` Go | Low | Medium | Pin contract API v2.2.1 / `go 1.24.0`; never `@latest` (Phase 0 step 6) |
 | Endorsement policy misconfigured at approve time | Medium | Medium | `checkcommitreadiness` must show `true` for all five orgs |
 | Private data not propagating | Low | Medium | Verify `requiredPeerCount` ≥ 1 and gossip endpoints set |
 | Stale chaincode containers between runs | High | Low | Teardown prunes `dev-peer*` containers |

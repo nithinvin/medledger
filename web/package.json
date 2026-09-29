@@ -1,0 +1,11 @@
+{
+  "name": "medledger-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MedLedger web UI: doctor, pharmacist, and regulator views",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  }
+}

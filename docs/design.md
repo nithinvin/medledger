@@ -490,8 +490,8 @@ sequenceDiagram
 | Blockchain framework | Hyperledger Fabric | 2.5.16 (2.5 LTS line) | Permissioned, pluggable consensus, private data support |
 | Consensus | Raft (etcdraft) | Built-in | Crash-fault tolerant, production default for Fabric 2.x |
 | Channel capabilities | Channel / Orderer / Application | `V2_0` / `V2_0` / `V2_5` | Application `V2_5` enables 2.5 features (e.g. private data purge) |
-| Chaincode language | **Go** | `go 1.22` in `go.mod` | Best-supported chaincode language; strong typing catches determinism bugs at compile time |
-| Chaincode SDK | `fabric-contract-api-go/v2` | 2.2.x | Official contract API |
+| Chaincode language | **Go** | `go 1.24.0` in `go.mod` | Best-supported chaincode language; strong typing catches determinism bugs at compile time |
+| Chaincode SDK | `fabric-contract-api-go/v2` | 2.2.1 (pinned) | Official contract API |
 | State database | CouchDB | 3.3.3 | Rich JSON queries for audit views; version paired with Fabric 2.5 samples |
 | Application runtime | Node.js | 22 LTS | Supported until April 2027 (Node 20 reached end of life April 2026) |
 | Application SDK | `@hyperledger/fabric-gateway` | 1.12+ | Modern gateway API, replaces legacy `fabric-network` |
@@ -502,7 +502,7 @@ sequenceDiagram
 | Certificate authority | Fabric CA | 1.5.22 | Per-org identity issuance |
 | Testing | Go `testing` + `testify`; Jest 30 for API | — | Unit tests for chaincode rules |
 
-> **Go version pinning.** Peers compile Go chaincode inside the `hyperledger/fabric-ccenv:2.5.16` image (Go 1.26.4), not with the host's Go. The `go` directive in `go.mod` must never exceed that image's Go version (check with `docker run --rm hyperledger/fabric-ccenv:2.5.16 go version`). `go mod init` writes the *host* version, so pin it explicitly to the minimum the dependencies need — `go mod edit -go=1.22` — which keeps any host Go ≥ 1.22 and any future ccenv working.
+> **Go version pinning.** Peers compile Go chaincode inside the `hyperledger/fabric-ccenv:2.5.16` image (Go 1.26.4), not with the host's Go. The `go` directive in `go.mod` must never exceed that image's Go version (check with `docker run --rm hyperledger/fabric-ccenv:2.5.16 go version`). Dependencies raise the minimum: `fabric-contract-api-go/v2` v2.2.1 requires Go 1.24.0, v2.2.2 requires 1.25.0, and v2.2.3 requires **1.26.7 — newer than ccenv 2.5.16, so it cannot be used**. Pin v2.2.1 (`go 1.24.0`), which builds on the host (Go 1.24+) and in ccenv. Omit the `toolchain` line (`go mod edit -toolchain=none`) so no toolchain download is attempted. Re-check this table before bumping either Fabric or the contract API.
 
 ### 6.1 Language Choice Note
 
