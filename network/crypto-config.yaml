@@ -1,10 +1,10 @@
 # cryptogen input — static identities for orderers, peers, and org admins.
 # Doctor/pharmacist/auditor identities are enrolled from Fabric CA in Phase 3;
 # each org's ca/ material generated here becomes that CA's signing root
-# (docs/design.md §2.3).
+# (docs/design/architecture.md#identity-and-ca-trust).
 #
 # EnableNodeOUs is required on every org: the .peer endorsement policy and
-# the "client" user type depend on it (docs/design.md §2.2).
+# the "client" user type depend on it (docs/design/architecture.md#endorsement-policy).
 #
 # SANS add localhost/127.0.0.1 so CLI tools on the host can reach the
 # published ports over TLS without hostname overrides.

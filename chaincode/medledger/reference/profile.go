@@ -1,2 +1,2 @@
-// Package reference — implemented in Phase 4 (docs/plan.md §4.1).
+// Package reference — implemented in Phase 4 (docs/plan.md Phase 4).
 package reference

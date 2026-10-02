@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # createChannel.sh — Phase 2 (docs/plan.md). Create prescription-channel with
-# the channel participation API (docs/design.md §2.4):
+# the channel participation API (docs/design/architecture.md#channel-creation):
 #   1. osnadmin channel join  — each of the 3 orderers
 #   2. peer channel join      — each of the 5 peers
 # Anchor peers are already in the genesis block. Idempotent: members that

@@ -1,2 +1,2 @@
-// Package rules — implemented in Phase 4 (docs/plan.md §4).
+// Package rules — implemented in Phase 4 (docs/plan.md Phase 4).
 package rules

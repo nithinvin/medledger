@@ -1,8 +1,16 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change  : 2.0.0 → 2.1.0
-Rationale       : Demo-project simplification. The REST API and web UI may be served over
+Version change  : 2.1.0 → 2.1.1
+Rationale       : Documentation reorganized (docs/design/ split, runbook, troubleshooting,
+                  decisions, glossary). References updated from section numbers to file +
+                  heading names. No principle changed. PATCH per own amendment rule.
+Added sections  : none
+Changed sections: references only
+Removed sections: none
+TODOs           : none
+
+Previous        : 2.0.0 → 2.1.0 — Demo-project simplification. The REST API and web UI may be served over
                   plain HTTP when bound to localhost only (docs/spec.md X7). Fabric TLS is
                   unchanged. Reference data must be embedded, not read at runtime.
                   MINOR per own amendment rule (new guidance, no principle removed).
@@ -20,12 +28,12 @@ Previous        : 1.0.0 → 2.0.0 — stack corrected from Python to Go + JavaSc
 
 ### I. Coding Standards — Go / Chaincode (NON-NEGOTIABLE)
 
-All chaincode lives under `chaincode/medledger/` and is written in Go, per `docs/design.md` §6.
+All chaincode lives under `chaincode/medledger/` and is written in Go, per `docs/design/architecture.md` (Technology Stack and Versions).
 
 - Code MUST be `gofmt`-formatted; no unformatted file may be committed.
 - Naming follows idiomatic Go: `MixedCaps`/`mixedCaps` (no underscores), exported identifiers
   capitalized only when part of the package's public API.
-- Package layout follows `docs/design.md` §9: `contracts/`, `models/`, `rules/`, `utils/`.
+- Package layout follows `docs/README.md` (Repository Structure): `contracts/`, `models/`, `rules/`, `utils/`.
 - Every returned error MUST be checked; wrap with context using `fmt.Errorf("...: %w", err)`.
   Never discard an error with `_` outside of deferred `Close()`-style calls.
 - No package-level mutable state.
@@ -33,7 +41,7 @@ All chaincode lives under `chaincode/medledger/` and is written in Go, per `docs
 ### II. Coding Standards — JavaScript (API Gateway & Web UI) (NON-NEGOTIABLE)
 
 The API gateway (`api/`) and web UI (`web/`) are plain JavaScript (ES2022+), per
-`docs/design.md` §6 — no TypeScript build step, to keep the stack simple for this project's
+`docs/design/architecture.md` — no TypeScript build step, to keep the stack simple for this project's
 short lifespan.
 
 - Code MUST be Prettier-formatted and ESLint-clean (recommended config).
@@ -87,7 +95,7 @@ Every code change MUST include tests covering:
 
 Additional requirements:
 - Chaincode: table-driven Go tests using `testify` with a mocked `ChaincodeStub`
-  (`docs/plan.md` §4.5), covering every fraud rule (R1–R7) and every derived status value.
+  (`docs/plan.md` Phase 4), covering every fraud rule (R1–R7) and every derived status value.
 - API: Jest tests for each route, including role-rejection cases (doctor calling a
   pharmacist-only endpoint and vice versa).
 - Every new code path MUST be exercised by at least one test.
@@ -161,7 +169,7 @@ The following are prohibited and MUST be corrected before completion:
   plain HTTP, provided they listen on `localhost`/`127.0.0.1` only (demo scope,
   `docs/spec.md` X7). Any exposure beyond localhost requires HTTPS.
 - Fraud rules and role checks MUST be enforced in chaincode, never only in the API layer — the
-  API layer is convenience, not the security boundary (`docs/design.md` §3.2).
+  API layer is convenience, not the security boundary (`docs/design/architecture.md`, Layer Responsibilities).
 - Patient-identifying fields MUST be sent as transient data, never as ordinary chaincode
   arguments, and stored only in the private data collection (`docs/spec.md` FR-7).
 - Follow OWASP Top 10 guidance; review every new code path for injection vulnerabilities.
@@ -169,7 +177,7 @@ The following are prohibited and MUST be corrected before completion:
 
 ## Non-functional Requirements
 
-Every implementation MUST consider the following dimensions, per `docs/spec.md` §6:
+Every implementation MUST consider the following dimensions, per `docs/spec.md` (Non-Functional Requirements):
 
 - **Reliability**: Chaincode failures MUST reject cleanly with a specific rule ID; no partial
   writes on failure (Fabric's simulate/endorse/commit model already guarantees atomicity per
@@ -195,9 +203,9 @@ Amendment procedure:
 MedLedger is a demonstration project. Where a simpler approach does not weaken the
 fraud-prevention properties (chaincode-enforced rules, cross-org endorsement, immutability,
 private patient data, determinism), prefer the simpler approach and record the trade-off in
-`docs/spec.md` §3.2 (Out of Scope).
+`docs/spec.md` (Out of Scope).
 
 All pull requests MUST verify compliance with every principle herein before merging.
 Complexity or deviation from these principles MUST be explicitly justified in the PR description.
 
-**Version**: 2.1.0 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-09-29
+**Version**: 2.1.1 | **Ratified**: 2026-09-15 | **Last Amended**: 2026-10-02

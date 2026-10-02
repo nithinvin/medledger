@@ -1,0 +1,21 @@
+# Decision Log — MedLedger
+
+Architectural decisions and the alternatives rejected. Append new decisions with the next `D` number; never renumber or delete — mark superseded ones instead.
+
+| # | Decision | Alternative rejected | Reason |
+|---|---|---|---|
+| D1 | Status derived at query time | Stored mutable `status` field | A pharmacy cannot modify a doctor-signed record without invalidating it; append-only ledgers have no update primitive |
+| D2 | Endorsement policy spans hospital AND pharmacy | Single-org endorsement | Cross-boundary agreement is the entire point of using a blockchain here |
+| D3 | Go for chaincode | JavaScript | Determinism safety; mature contract API |
+| D4 | Patient data in private collection | Full patient data on ledger | Every org would otherwise hold PHI for every patient in the network |
+| D5 | Transient data for patient fields | Regular chaincode arguments | Regular arguments are written to the blockchain of every org |
+| D6 | Composite keys with range queries | CouchDB rich queries for core paths | Rich queries are not re-executed deterministically during validation |
+| D7 | Fraud rules only in chaincode | Duplicated in API as enforcement | API can be bypassed by direct chaincode invocation |
+| D8 | Regulator excluded from private collection | Regulator included | Demonstrates data minimization; regulator can be granted access via governance if needed |
+| D9 | Fabric CA signs with the cryptogen CA key per org | Separate CA roots; or Fabric CA for all identities | One root of trust per org with the least setup; cryptogen stays for static node identities |
+| D10 | Channel participation API (`osnadmin`) | Orderer system channel | System channel is deprecated in 2.5 and removed in 3.x |
+| D11 | Generic control classes + embedded jurisdiction profile (India default) | Hard-coded US DEA schedules | Same rules serve any country; profile changes go through chaincode-upgrade governance |
+| D12 | API-generated salt in private payload | Plain hash of patient fields | Prevents dictionary reversal of the public hash; randomness stays out of chaincode |
+| D13 | R4/R7 split by same vs. different pharmacy | Two overlapping time windows | Makes both rules reachable and gives pharmacy shopping its own rule ID |
+
+> **On D6:** CouchDB rich queries (`GetQueryResult`) are evaluated during simulation but **not** re-evaluated at validation time, so results can be stale by commit time. They are safe for read-only query functions, and unsafe inside functions that write state based on their results. Core fraud checks therefore use deterministic composite-key range queries.

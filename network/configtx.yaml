@@ -2,10 +2,10 @@
 #
 # Fabric 2.5 channel participation: this produces the channel's genesis block
 # directly (no orderer system channel). Orderers join it via `osnadmin`,
-# peers via `peer channel join` (docs/design.md §2.4).
+# peers via `peer channel join` (docs/design/architecture.md#channel-creation).
 #
 # MSPDir and TLS cert paths are relative to this file's directory.
-# MSP IDs must match docs/design.md §2.1 exactly — chaincode reads them.
+# MSP IDs must match docs/design/architecture.md#organizations-and-hostnames exactly — chaincode reads them.
 
 ---
 Organizations:

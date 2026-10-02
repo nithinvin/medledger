@@ -1,0 +1,48 @@
+# Troubleshooting — MedLedger
+
+Symptom → cause → fix, grouped by area. Add new entries to the matching table when a failure is diagnosed. Fabric terms are explained in the [glossary](glossary.md).
+
+---
+
+## Setup and Toolchain
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Chaincode build fails with a Go toolchain/version error | `go.mod` `go` directive is newer than `fabric-ccenv`'s Go | Keep the pins in [architecture.md](design/architecture.md#technology-stack-and-versions); never `go get …@latest` for the contract API |
+| Scripts fail with `$'\r': command not found` on WSL | CRLF line endings from a Windows-side checkout | Clone inside the WSL filesystem; `.gitattributes` forces LF on `*.sh` |
+| Bind mounts or Docker socket denied on openSUSE | SELinux enforcing | Every compose service already sets `label=disable`; check it was not removed |
+
+## Crypto Material and Channel
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Every endorsement fails the `.peer` policy, though everything before chaincode commit worked | `EnableNodeOUs` off for an org | Set `EnableNodeOUs: true` for every org in `crypto-config.yaml`; regenerate |
+| Chaincode authorization fails with the wrong org, or `GetMSPID()` returns an unexpected value | MSP ID mismatch between `crypto-config.yaml` domain names and `configtx.yaml` `ID` fields | `ID` must be exactly the value in [Organizations and Hostnames](design/architecture.md#organizations-and-hostnames), e.g. `HospitalAMSP` |
+| Strange TLS/identity errors after regenerating artifacts | Containers still hold the old certificates | `down.sh`, then `generateArtifacts.sh`, `up.sh`, `createChannel.sh` (the script now refuses to regenerate while the network is up) |
+| `x509: certificate is valid for …, not localhost` | Connecting by a name missing from the certificate's SAN list | Use `localhost` / the Docker hostname; both are in the node certificates' SANs |
+
+## Identities (Fabric CA)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Every chaincode call fails with a confusing "unauthorized"; `GetAttributeValue("role")` is empty | Attribute registered without `:ecert`, so it is in the CA database but not the certificate | Re-register with `--id.attrs 'role=<role>:ecert'`, re-enroll; verify with `openssl x509 -text` |
+| Every transaction from a user is rejected as an unknown identity; `openssl verify` against the org `cacerts` fails | The CA generated its own root instead of using cryptogen's `ca/` key | Start the CA with `FABRIC_CA_SERVER_CA_CERTFILE` / `_KEYFILE` pointing at the org's cryptogen `ca/` ([Identity and CA Trust](design/architecture.md#identity-and-ca-trust)) |
+
+## Chaincode Deployment
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `checkcommitreadiness` shows `false` for an org | That org's approve used a different policy, collection config, or sequence number | Re-approve with identical arguments |
+| `ENDORSEMENT_POLICY_FAILURE` at commit | `--peerAddresses` omitted a peer required by the policy, or NodeOUs not enabled | Pass a hospital and a pharmacy peer; check NodeOUs |
+| Empty private data on read | Transient map keys mismatched, or values not base64-encoded | Match the keys in [Function Behaviour](design/chaincode.md#function-behaviour); base64-encode values |
+| `MVCC_READ_CONFLICT` | Two transactions writing the same key in one block | Expected under concurrent load; retry |
+| Old chaincode behaviour after redeploying | Stale `dev-peer*` containers | `down.sh` prunes them |
+
+## Expected Log Noise
+
+These look like errors but are normal:
+
+| Log line | When | Why it is harmless |
+|---|---|---|
+| `gossip.comm ... Authentication failed: failed classifying identity` | During `createChannel.sh`, for a second or two | A peer gossips with peers not yet on the channel, whose MSPs it cannot classify yet. Persistent occurrences after all peers joined mean an MSP problem. |
+| CouchDB messages about missing `_users` database | CouchDB start-up | Single-node CouchDB without system databases; Fabric does not need them |

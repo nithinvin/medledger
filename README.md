@@ -1,22 +1,18 @@
 # MedLedger
 
-Prescription issuance and fulfillment tracking on Hyperledger Fabric.
+Prescription issuance and fulfillment tracking on Hyperledger Fabric: five organizations (two hospitals, two pharmacies, a regulator) share one ledger, and chaincode rejects forged, duplicate, and cross-pharmacy fraudulent prescriptions.
 
-- Specification: [docs/spec.md](docs/spec.md)
-- Design: [docs/design.md](docs/design.md)
-- Implementation plan: [docs/plan.md](docs/plan.md)
-- Engineering rules: [CONSTITUTION.md](CONSTITUTION.md)
+**Documentation:** start at [docs/README.md](docs/README.md) — it maps every question to the file that answers it.
 
-## Prerequisites (Phase 0)
+## Quick Start
 
-Fabric binaries and images are **not** committed. From the repo root:
+Install the prerequisites per the [runbook](docs/runbook.md#install), then from the repository root:
 
 ```bash
-curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
-chmod +x install-fabric.sh
-./install-fabric.sh --fabric-version 2.5.16 --ca-version 1.5.22 binary docker
-docker pull couchdb:3.3.3
-export PATH="$PWD/bin:$PATH"
+network/scripts/generateArtifacts.sh   # crypto material + channel genesis block
+network/scripts/up.sh                  # start the 18 containers
+network/scripts/createChannel.sh       # join orderers and peers to prescription-channel
+network/scripts/down.sh                # tear everything down
 ```
 
-Full setup and one-command demo instructions arrive in Phase 8.
+The full demo (users, chaincode, API, web UI) arrives in later phases — see [plan status](docs/plan.md#status).

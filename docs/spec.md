@@ -4,11 +4,12 @@
 **Platform:** Hyperledger Fabric
 **Document status:** Baseline specification for implementation handoff
 **Nature:** Demonstration project — simplify wherever it does not weaken the core fraud-prevention claim
-**Terminology:** Fabric terms (MSP, NodeOUs, endorsement, channel, …) are explained in `design.md` §1.2
+**Terminology:** Fabric terms (MSP, NodeOUs, endorsement, channel, …) are explained in the [glossary](glossary.md)
+**Related:** [design/](design/) · [plan](plan.md) · [doc map](README.md)
 
 ---
 
-## 1. Problem Statement
+## Problem Statement
 
 Controlled-drug prescriptions are vulnerable to several classes of fraud that existing record-keeping cannot reliably detect:
 
@@ -21,9 +22,9 @@ Controlled-drug prescriptions are vulnerable to several classes of fraud that ex
 
 The deeper structural issue is **absence of mutual trust**. Competing hospital systems and pharmacy chains will not accept one another's server as the authoritative record. A solution must therefore be verifiable without requiring any participant to trust any other participant's infrastructure.
 
-### 1.1 Jurisdiction
+### Jurisdiction
 
-Controlled-drug law differs by country. The chaincode is **jurisdiction-neutral**: it enforces limits attached to a generic *control class*, and the mapping from drugs to control classes and from classes to limits comes from a **jurisdiction profile** (a static reference file, §7.5).
+Controlled-drug law differs by country. The chaincode is **jurisdiction-neutral**: it enforces limits attached to a generic *control class*, and the mapping from drugs to control classes and from classes to limits comes from a **jurisdiction profile** (a static reference file, see [Jurisdiction Profile](#jurisdiction-profile-compiled-into-chaincode)).
 
 The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforced by the Narcotics Control Bureau) and Schedules X, H1 and H of the Drugs and Cosmetics Rules, 1945 (regulated by CDSCO and state drug controllers). Another country, such as the US with DEA Schedules II–V, is supported by supplying a different profile — no chaincode logic changes.
 
@@ -31,9 +32,9 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 
 ---
 
-## 2. Objectives
+## Objectives
 
-### 2.1 Primary Objectives
+### Primary Objectives
 
 - **O1 — Non-forgeable issuance.** Every prescription is cryptographically signed by an identity provably issued by a registered hospital organization.
 - **O2 — Tamper-evident history.** Once committed, no prescription or fulfillment record can be modified or deleted by any participant, including the organization that created it.
@@ -41,7 +42,7 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 - **O4 — Distributed validation.** No single organization can unilaterally commit a record; validity requires independent agreement between organizations.
 - **O5 — Role-separated authority.** Doctors may only issue; pharmacies may only record fulfillment. Neither can perform the other's action, and neither can mutate the other's records.
 
-### 2.2 Secondary Objectives
+### Secondary Objectives
 
 - **O6 — Patient data minimization.** Patient-identifying data is visible only to organizations with a legitimate need; the shared ledger carries only salted hash references.
 - **O7 — Auditability.** A regulator role can reconstruct and verify the full history of any prescription.
@@ -49,9 +50,9 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 
 ---
 
-## 3. Scope
+## Scope
 
-### 3.1 In Scope
+### In Scope
 
 | ID | Capability |
 |---|---|
@@ -68,7 +69,7 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 | S11 | Single-host Docker Compose deployment for demonstration |
 | S12 | Jurisdiction profile (drug reference list + control-class limits); India profile as the default |
 
-### 3.2 Out of Scope
+### Out of Scope
 
 | ID | Excluded | Rationale |
 |---|---|---|
@@ -84,7 +85,7 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 
 ---
 
-## 4. Actors and Roles
+## Actors and Roles
 
 | Actor | Organization type | Permitted actions |
 |---|---|---|
@@ -99,7 +100,7 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 
 ---
 
-## 5. Functional Requirements
+## Functional Requirements
 
 ### FR-1 — Prescription Issuance
 A doctor submits a prescription containing drug code, quantity, dosage instructions, refills allowed, and validity window. Chaincode validates the submitter's role and organization, rejects duplicate prescription IDs, looks up the drug code in the jurisdiction profile (rejecting unknown codes), copies the drug name and control class from the profile onto the record, enforces the control class's refill limit (R6), and writes an immutable record.
@@ -115,7 +116,7 @@ Status is computed at query time from the prescription record plus all associate
 > **Design constraint (non-negotiable):** `status` must never exist as a stored, mutable field on the prescription record. The prescription is authored and signed by the doctor; a pharmacy cannot alter it without invalidating that authorship. Status is a projection over an append-only event stream, not a column.
 
 ### FR-4 — Fraud Rules
-Enforced inside chaincode at endorsement time. "Refill interval" means the control class's `minRefillIntervalDays` from the jurisdiction profile (§7.5); an interval of 0 disables R4 and R7.
+Enforced inside chaincode at endorsement time. "Refill interval" means the control class's `minRefillIntervalDays` from the [jurisdiction profile](#jurisdiction-profile-compiled-into-chaincode); an interval of 0 disables R4 and R7.
 
 | Rule | Condition | Outcome |
 |---|---|---|
@@ -127,7 +128,7 @@ Enforced inside chaincode at endorsement time. "Refill interval" means the contr
 | R6 Class refill limit | `refillsAllowed` exceeds the control class's `maxRefills` (e.g. 0 for NDPS drugs) | Reject at issuance |
 | R7 Early refill, different pharmacy | Last fulfillment was by a **different** pharmacy MSP, less than the refill interval ago (pharmacy shopping) | Reject, flag |
 
-R4 and R7 are mutually exclusive by construction (same vs. different pharmacy). Rules are evaluated in the order given in `design.md` §4.5; the first failing rule is reported.
+R4 and R7 are mutually exclusive by construction (same vs. different pharmacy). Rules are evaluated in the order given in [Fraud Rule Evaluation Order](design/chaincode.md#fraud-rule-evaluation-order); the first failing rule is reported.
 
 ### FR-5 — Revocation
 A doctor may append a revocation record for a prescription they issued (same MSP ID and common name as the issuer). The original record remains on the ledger unchanged; revocation is a separate appended event that the status derivation accounts for.
@@ -143,7 +144,7 @@ The drug reference list and control-class limits are compiled into the chaincode
 
 ---
 
-## 6. Non-Functional Requirements
+## Non-Functional Requirements
 
 | ID | Requirement | Target |
 |---|---|---|
@@ -160,9 +161,9 @@ The drug reference list and control-class limits are compiled into the chaincode
 
 ---
 
-## 7. Data Specification
+## Data Specification
 
-### 7.1 Prescription (public ledger)
+### Prescription (public ledger)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -180,7 +181,7 @@ The drug reference list and control-class limits are compiled into the chaincode
 | `issuedAt` | string (ISO-8601) | From transaction timestamp |
 | `docType` | string | Literal `"prescription"` |
 
-### 7.2 Fulfillment (public ledger)
+### Fulfillment (public ledger)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -193,7 +194,7 @@ The drug reference list and control-class limits are compiled into the chaincode
 | `sequence` | number | 0-indexed fulfillment number |
 | `docType` | string | Literal `"fulfillment"` |
 
-### 7.3 Revocation (public ledger)
+### Revocation (public ledger)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -205,7 +206,7 @@ The drug reference list and control-class limits are compiled into the chaincode
 | `revokedAt` | string (ISO-8601) | From transaction timestamp |
 | `docType` | string | Literal `"revocation"` |
 
-### 7.4 PatientData (private data collection)
+### PatientData (private data collection)
 
 | Field | Type |
 |---|---|
@@ -217,7 +218,7 @@ The drug reference list and control-class limits are compiled into the chaincode
 
 Collection name: `patientDataCollection`. Members: hospital and pharmacy org MSPs. Not the ordering service, not the regulator by default.
 
-### 7.5 Jurisdiction Profile (compiled into chaincode)
+### Jurisdiction Profile (compiled into chaincode)
 
 **Control classes** — India profile (illustrative demo limits):
 
@@ -235,7 +236,7 @@ A US profile would instead define classes such as `DEA_II` (`maxRefills` 0) thro
 
 ---
 
-## 8. Acceptance Criteria
+## Acceptance Criteria
 
 The implementation is complete when all of the following pass:
 
@@ -257,10 +258,10 @@ The implementation is complete when all of the following pass:
 
 ---
 
-## 9. Assumptions and Constraints
+## Assumptions and Constraints
 
 - All participating organizations are known and admitted at network-configuration time; this is a permissioned, not public, network.
-- Drug validation uses the static jurisdiction profile (§7.5), not a live national drug database.
+- Drug validation uses the static [jurisdiction profile](#jurisdiction-profile-compiled-into-chaincode), not a live national drug database.
 - Clock skew between organizations is handled by using transaction timestamps from the transaction proposal rather than local peer clocks.
 - The demo runs on a single host; organizational separation is logical (separate MSPs, separate containers) rather than physical.
 - The demo host is a developer workstation (openSUSE Leap 16.0, or Ubuntu 24.04 on WSL2); services are reachable on `localhost` only.

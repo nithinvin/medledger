@@ -1,4 +1,4 @@
-# MedLedger single-host network — docs/design.md §8, docs/plan.md Phase 2.
+# MedLedger single-host network — docs/design/architecture.md#deployment, docs/plan.md Phase 2.
 #
 # 18 containers: 3 Raft orderers, 5 peers, 5 CouchDBs, 5 Fabric CAs.
 # Keep the five org blocks symmetric when editing.
@@ -6,7 +6,7 @@
 # - Every published port binds to 127.0.0.1 (demo host only).
 # - Credentials (CouchDB admin/adminpw, CA admin/adminpw) are fixed demo
 #   defaults; acceptable only because nothing listens beyond localhost
-#   (docs/spec.md §3.2 X9).
+#   (docs/spec.md#out-of-scope X9).
 # - security_opt label=disable: lets bind mounts and the Docker socket work on
 #   SELinux hosts (fresh openSUSE Leap 16) without :z relabelling; a no-op on
 #   AppArmor hosts and WSL.
@@ -80,7 +80,7 @@ x-ca-env: &ca-env
   FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
   FABRIC_CA_SERVER_TLS_ENABLED: "true"
   # Sign with the org's cryptogen root so enrolled users are channel members
-  # (docs/design.md §2.3)
+  # (docs/design/architecture.md#identity-and-ca-trust)
   FABRIC_CA_SERVER_CA_KEYFILE: /etc/hyperledger/fabric-ca-server-config/priv_sk
 
 x-ca: &ca
