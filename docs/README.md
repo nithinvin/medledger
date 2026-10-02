@@ -19,7 +19,7 @@ Start here. Each fact lives in exactly one file; other files link to it rather t
 
 ## Conventions
 
-- **Cross-references are links** to a file and heading (e.g. `design/chaincode.md#fraud-rule-evaluation-order`), never section numbers. Renaming a heading means updating its links — search the repo for the old anchor.
+- **Cross-references are links** to a file and heading (e.g. `design/chaincode.md#fraud-rule-evaluation-order`), never section numbers. Renaming a heading means updating its links; `node scripts/check-doc-links.mjs` reports any that broke, in docs and in code comments.
 - **Stable IDs** never change meaning: requirements `FR-n`, `NFR-n`, `AC-n`, scope `Sn` / `Xn`, fraud rules `R1`–`R7`, decisions `Dn`.
 - **Single source of truth:** versions → architecture; install steps, ports, credentials → runbook; API routes → application; failures → troubleshooting.
 - New decisions are appended to `decisions.md`; diagnosed failures are added to `troubleshooting.md`; `plan.md`'s status table is updated when a phase's exit gate passes.
@@ -29,8 +29,13 @@ Start here. Each fact lives in exactly one file; other files link to it rather t
 ```
 medledger/
 ├── README.md
+├── CLAUDE.md                    # Claude Code instructions (imports CONSTITUTION.md)
 ├── CONSTITUTION.md
 ├── run-demo.sh
+├── .shellcheckrc
+├── .claude/settings.json        # shared Claude Code permission allowlist
+├── scripts/
+│   └── check-doc-links.mjs      # doc cross-reference checker
 ├── docs/
 │   ├── README.md                # this doc map
 │   ├── spec.md

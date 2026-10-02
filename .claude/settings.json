@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(shellcheck *)",
+      "Bash(node scripts/check-doc-links.mjs)",
+      "Bash(docker compose -f network/docker-compose.yaml config *)",
+      "Bash(docker compose -f network/docker-compose.yaml ps *)",
+      "Bash(go version)",
+      "Bash(osnadmin channel list *)",
+      "Bash(docker info)",
+      "Bash(docker info *)"
+    ]
+  }
+}
