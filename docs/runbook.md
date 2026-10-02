@@ -63,7 +63,7 @@ Every port binds to `127.0.0.1` only. Credentials are fixed demo values ([spec X
 | Peers | `peer0.<org>.example.com` | hospitala 7051, hospitalb 8051, pharmacyx 9051, pharmacyy 10051, regulator 11051 | TLS; org Admin MSP for CLI |
 | Fabric CAs | `ca.<org>.example.com` | 7054 / 8054 / 9054 / 10054 / 11054 (same org order) | `admin` / `adminpw`; demo users enroll with `<username>pw` |
 | CouchDB | `couchdb-a`, `-b`, `-x`, `-y`, `-r` | 5984 / 6984 / 7984 / 8984 / 9984 — UI at `/_utils` | `admin` / `adminpw` |
-| API gateway | — | 3000 | Demo logins ([Demo Accounts](#demo-accounts)) |
+| API gateway | `node src/server.js` (host process) | 3000 | Demo logins: `<username>` / `<username>pw` |
 | Web UI | — | 5173 | Demo logins |
 
 ## Network Scripts
@@ -103,6 +103,28 @@ Run from `chaincode/medledger/`:
 | Lint | `golangci-lint run ./...` (v2.14.0) |
 | Lint without a host install | `docker run --rm -v "$PWD":/app -v "$(go env GOMODCACHE)":/go/pkg/mod -w /app golangci/golangci-lint:v2.14.0 golangci-lint run ./...` |
 | Determinism grep | `grep -rn "time.Now()\|rand\.\|os.Getenv\|os.ReadFile\|math/rand\|GetQueryResult" --include=*.go . \| grep -v _test.go` |
+
+## API Gateway
+
+Needs the network up with users enrolled and chaincode deployed. From `api/`:
+
+| Task | Command |
+|---|---|
+| Install dependencies | `npm ci` |
+| Start | `npm start` — listens on `http://127.0.0.1:3000` |
+| Unit tests (no network) | `npm test` |
+| Live tests (real network) | `npm run test:live` — starts its own server on a random port |
+| Lint / format check | `npm run lint`, `npm run format:check` |
+
+Environment: `PORT` (default 3000), `LOG_LEVEL` (`debug`/`info`/`warn`/`error`), `MEDLEDGER_JWT_SECRET` (keeps logins valid across restarts; random per process if unset).
+
+Try it:
+
+```bash
+TOKEN=$(curl -s localhost:3000/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"dr.smith","password":"dr.smithpw"}' | jq -r .token)
+curl -s localhost:3000/api/drugs -H "Authorization: Bearer $TOKEN" | jq '.drugs[].drugCode'
+```
 
 ## One-Command Startup
 

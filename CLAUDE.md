@@ -22,6 +22,7 @@ The constitution below is binding for all code, architecture, refactoring, and a
 | Chaincode tests / lint | `cd chaincode/medledger && go test ./...` — full gate list in `docs/runbook.md#chaincode-development` |
 | Network lifecycle | `network/scripts/{generateArtifacts,up,createChannel,enrollUsers,deployChaincode,down}.sh` |
 | End-to-end check | `network/scripts/smokeTest.sh` |
+| API tests / lint | `cd api && npm test && npm run lint && npm run format:check`; live: `npm run test:live` |
 | Point `peer` CLI at an org | `source network/scripts/common.sh && set_peer_env <org>` |
 
 ## Gotchas

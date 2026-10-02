@@ -15,7 +15,8 @@ network/scripts/createChannel.sh       # join orderers and peers to prescription
 network/scripts/enrollUsers.sh         # enroll the five demo users
 network/scripts/deployChaincode.sh     # deploy the chaincode (~2 min)
 network/scripts/smokeTest.sh           # end-to-end check: issue, fulfill, fraud, privacy
+(cd api && npm ci && npm start)        # REST API on http://127.0.0.1:3000
 network/scripts/down.sh                # tear everything down
 ```
 
-The API and web UI arrives in later phases — see [plan status](docs/plan.md#status).
+The web UI arrivess in later phases — see [plan status](docs/plan.md#status).

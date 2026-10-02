@@ -92,17 +92,23 @@ medledger/
 │       ├── internal/mock/          # in-memory ledger, test-only
 │       └── */*_test.go
 ├── api/
-│   ├── package.json
+│   ├── package.json             # + eslint.config.js, .prettierrc.json
 │   ├── src/
-│   │   ├── server.js
-│   │   ├── gateway.js
+│   │   ├── server.js            # entry point: real Fabric service, listens on 127.0.0.1
+│   │   ├── app.js               # Express app; Fabric service injected
+│   │   ├── config.js            # users, orgs, peers, paths
+│   │   ├── gateway.js           # Fabric service (submit / evaluate / endorsers)
 │   │   ├── identities.js
-│   │   ├── middleware/auth.js
+│   │   ├── endorsers.js         # decode qscc transactions → endorsing MSPs
+│   │   ├── errors.js            # chaincode code → HTTP status
+│   │   ├── validation.js
+│   │   ├── logger.js
+│   │   ├── middleware/auth.js   # login, JWT, role check
 │   │   └── routes/
 │   │       ├── prescriptions.js
 │   │       ├── fulfillments.js
 │   │       └── audit.js
-│   └── test/
+│   └── test/                    # unit tests (fake Fabric) + live.test.js
 ├── web/
 │   ├── package.json
 │   └── src/

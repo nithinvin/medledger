@@ -11,6 +11,10 @@ The API serves plain HTTP on `localhost:3000` and the web UI on `localhost:5173`
 
 ## API Gateway
 
+### Structure
+
+`app.js` builds the Express app from an injected **Fabric service** (`submit`, `evaluate`, `transactionEndorsers`, `close`). `server.js` injects the real one from `gateway.js`; unit tests inject a fake, so every route is tested without a network. The API binds to `127.0.0.1` only. The web UI reaches it through the Vite dev-server proxy (`/api` → `localhost:3000`), so no CORS configuration is needed.
+
 ### Identities
 
 `api/src/identities.js` — for each of the five enrolled users (`plan.md` Phase 3), load the signing certificate and private key from their MSP directory. `@hyperledger/fabric-gateway` has no wallet object.
@@ -26,7 +30,12 @@ The API serves plain HTTP on `localhost:3000` and the web UI on `localhost:5173`
 
 ### Authentication
 
-`api/src/middleware/auth.js` — map a login (username/password for the demo) to an enrolled identity; issue a JWT carrying the identity label, MSP ID, and role.
+`api/src/middleware/auth.js` — map a login to an enrolled identity and issue a JWT (HS256, 8 h) carrying the username, MSP ID, org, and role.
+
+- Demo passwords are `<username>pw`, compared in constant time ([spec X9](../spec.md#out-of-scope)).
+- The signing secret comes from `MEDLEDGER_JWT_SECRET`; if unset, a random per-process secret is used and tokens stop working when the API restarts. No secret is stored in the source.
+- Identity for chaincode calls always comes from the JWT, never from request parameters (e.g. `/api/doctors/me/prescriptions` uses the token's MSP and username).
+- Missing, tampered, or expired tokens → `401 UNAUTHENTICATED`. Role checks here are UX only; the chaincode enforces them ([D7](../decisions.md)).
 
 ### API Routes
 
@@ -44,6 +53,21 @@ The API serves plain HTTP on `localhost:3000` and the web UI on `localhost:5173`
 | POST | `/api/prescriptions/:id/revoke` | doctor | `RevokePrescription` |
 | GET | `/api/doctors/me/prescriptions` | doctor | `GetPrescriptionsByDoctor` (MSP + ID from the JWT) |
 | GET | `/api/audit/:id/history` | regulator | `GetPrescriptionHistory` + `qscc` `GetTransactionByID` per entry for endorsing orgs |
+
+### Request and Response Shapes
+
+| Route | Body / query | Response |
+|---|---|---|
+| `POST /api/auth/login` | `{ username, password }` | `{ token, user: { username, role, msp, org } }` |
+| `POST /api/prescriptions` | `{ patientName, patientDOB, patientRef, drugCode, quantity, dosageInstructions, refillsAllowed, validityDays }` | `201` prescription record. The API generates the `prescriptionId` (UUID) and the salt |
+| `GET /api/prescriptions/:id/status` | — | `{ prescriptionId, status }` |
+| `GET /api/prescriptions/:id/eligibility` | `?quantity=<n>` | `{ eligible, status, rule?, reason? }` |
+| `POST /api/prescriptions/:id/fulfillments` | `{ quantityDispensed }` | `201` fulfillment record |
+| `POST /api/prescriptions/:id/revoke` | `{ reason }` | `201` revocation record |
+| `GET /api/audit/:id/history` | — | `{ prescriptionId, entries: [{ txId, timestamp, isDelete, value, validationCode, endorsers: [msp…] }] }` |
+| `GET /api/health` | — | `{ status: "ok" }` (no auth) |
+
+Other routes return the chaincode result as JSON. Errors are always `{ error, rule?, message }`: `rule` is set for R1–R7, and 500s never expose internal details.
 
 ### Error Mapping
 

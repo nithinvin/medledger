@@ -42,6 +42,15 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 | Hash or byte comparison of stored JSON fails on the network but passes in unit tests | CouchDB returns JSON re-serialized with sorted keys | Decode, then re-encode via the Go struct before hashing or comparing; the test mock now re-serializes JSON the same way |
 | `deployChaincode.sh` says the sequence is already committed, but the code changed | Same `CC_SEQUENCE` as the committed definition | Bump `CC_VERSION` and `CC_SEQUENCE` ([runbook](runbook.md#network-scripts)) |
 
+## API Gateway
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Jest: `Must use import to load ES Module: …/@noble/curves/…` | A Jest test imported `@hyperledger/fabric-gateway`; Jest on Node 22 cannot load its ESM-only dependency | Don't import `gateway.js` in Jest tests: inject a fake service, or start the real server like `test/live.test.js` ([D18](decisions.md)) |
+| API returns `500` and logs `14 UNAVAILABLE` | The network is down, or the peer for that user's org is not running | `network/scripts/up.sh` (and redeploy chaincode after `down.sh`) |
+| `server.js` exits at start: `expected one private key …` or file not found | Demo users not enrolled | `network/scripts/enrollUsers.sh` |
+| Logins stop working after restarting the API | Random per-process JWT secret | Set `MEDLEDGER_JWT_SECRET` |
+
 ## Expected Log Noise
 
 These look like errors but are normal:

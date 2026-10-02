@@ -15,9 +15,9 @@
 | 2 | Network Bring-Up | M1 | ✅ Done | `badf573` |
 | 3 | Identity Enrollment | M1 | ✅ Done | `64667cf` |
 | 4 | Chaincode Implementation | M2 — Contract working | ✅ Done | `460463c` |
-| 5 | Chaincode Deployment | M2 | ✅ Done | *(next commit)* |
-| 6 | API Gateway | M3 — Application layer | ⏳ Next | — |
-| 7 | Web UI | M3 | — | — |
+| 5 | Chaincode Deployment | M2 | ✅ Done | `ea59fd2` |
+| 6 | API Gateway | M3 — Application layer | ✅ Done | *(next commit)* |
+| 7 | Web UI | M3 | ⏳ Next | — |
 | 8 | Demo Scenarios and Documentation | M4 — Demo ready | — | — |
 
 Update this table when a phase's exit gate passes.
@@ -244,7 +244,8 @@ Update this table when a phase's exit gate passes.
 1. Implement identity loading, per-org gateway connections, and JWT authentication per [API Gateway](design/application.md#api-gateway).
 2. Implement every route in [API Routes](design/application.md#api-routes).
 3. Implement [Error Mapping](design/application.md#error-mapping) and [Transient Data and Salt](design/application.md#transient-data-and-salt).
-4. Write Jest tests for each route, including role-rejection cases.
+4. Write Jest tests for each route, including role-rejection cases, against an injected fake Fabric service.
+5. Write `test/live.test.js` (`npm run test:live`): starts the real server and runs the exit-gate checks below against the network.
 
 **Exit gate:**
 - All endpoints respond correctly against the live network
