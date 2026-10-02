@@ -102,6 +102,9 @@ graph TB
 | PharmacyX | `PharmacyXMSP` | Records fulfillments | Yes |
 | PharmacyY | `PharmacyYMSP` | Records fulfillments | Yes |
 | Regulator | `RegulatorMSP` | Read-only oversight | No (query only) |
+| Orderer | `OrdererMSP` | Raft ordering service (`orderer1`–`orderer3`) | — |
+
+**Hostnames.** Each peer org's domain is `<org>.example.com` (e.g. `peer0.hospitala.example.com`, `ca.hospitala.example.com`); orderers are `orderer1.example.com`–`orderer3.example.com`. `example.com` is reserved for documentation, so it never collides with a real domain. Node TLS certificates also carry `localhost` / `127.0.0.1` so host-side CLI tools can connect to published ports.
 
 ### 2.2 Endorsement Policy
 

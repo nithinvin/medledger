@@ -1,1 +1,233 @@
-# Written in Phase 1 (docs/plan.md Phase 1, step 4).
+# configtxgen input for prescription-channel.
+#
+# Fabric 2.5 channel participation: this produces the channel's genesis block
+# directly (no orderer system channel). Orderers join it via `osnadmin`,
+# peers via `peer channel join` (docs/design.md §2.4).
+#
+# MSPDir and TLS cert paths are relative to this file's directory.
+# MSP IDs must match docs/design.md §2.1 exactly — chaincode reads them.
+
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: organizations/ordererOrganizations/example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer1.example.com:7050
+      - orderer2.example.com:8050
+      - orderer3.example.com:9050
+
+  - &HospitalA
+    Name: HospitalAMSP
+    ID: HospitalAMSP
+    MSPDir: organizations/peerOrganizations/hospitala.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('HospitalAMSP.admin', 'HospitalAMSP.peer', 'HospitalAMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('HospitalAMSP.admin', 'HospitalAMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('HospitalAMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('HospitalAMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.hospitala.example.com
+        Port: 7051
+
+  - &HospitalB
+    Name: HospitalBMSP
+    ID: HospitalBMSP
+    MSPDir: organizations/peerOrganizations/hospitalb.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('HospitalBMSP.admin', 'HospitalBMSP.peer', 'HospitalBMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('HospitalBMSP.admin', 'HospitalBMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('HospitalBMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('HospitalBMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.hospitalb.example.com
+        Port: 8051
+
+  - &PharmacyX
+    Name: PharmacyXMSP
+    ID: PharmacyXMSP
+    MSPDir: organizations/peerOrganizations/pharmacyx.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PharmacyXMSP.admin', 'PharmacyXMSP.peer', 'PharmacyXMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PharmacyXMSP.admin', 'PharmacyXMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PharmacyXMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PharmacyXMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.pharmacyx.example.com
+        Port: 9051
+
+  - &PharmacyY
+    Name: PharmacyYMSP
+    ID: PharmacyYMSP
+    MSPDir: organizations/peerOrganizations/pharmacyy.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('PharmacyYMSP.admin', 'PharmacyYMSP.peer', 'PharmacyYMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('PharmacyYMSP.admin', 'PharmacyYMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('PharmacyYMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('PharmacyYMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.pharmacyy.example.com
+        Port: 10051
+
+  - &Regulator
+    Name: RegulatorMSP
+    ID: RegulatorMSP
+    MSPDir: organizations/peerOrganizations/regulator.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('RegulatorMSP.admin', 'RegulatorMSP.peer', 'RegulatorMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('RegulatorMSP.admin', 'RegulatorMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('RegulatorMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('RegulatorMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.regulator.example.com
+        Port: 11051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  # Lifecycle approvals need a majority (3 of 5 orgs). The chaincode's own
+  # endorsement policy (hospital AND pharmacy) is set at approve time, Phase 5.
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer1.example.com
+        Port: 7050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/server.crt
+      - Host: orderer2.example.com
+        Port: 8050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
+      - Host: orderer3.example.com
+        Port: 9050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer3.example.com/tls/server.crt
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  MedLedgerChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *HospitalA
+        - *HospitalB
+        - *PharmacyX
+        - *PharmacyY
+        - *Regulator
+      Capabilities: *ApplicationCapabilities

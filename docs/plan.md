@@ -72,7 +72,7 @@ This phase creates five organizations' identities. Getting MSP directory structu
    cryptogen generate --config=./crypto-config.yaml --output=./organizations
    ```
    *(`cryptogen` issues the static node and admin identities. Each org's `ca/` directory it produces becomes that org's Fabric CA signing root in Phase 2 — `design.md` §2.3.)*
-3. Verify each org produced `ca/` (CA cert + key) and `msp/` with `cacerts`, `tlscacerts`, and `config.yaml` (NodeOUs). With NodeOUs enabled there is no `admincerts` directory — that is expected.
+3. Verify each org produced `ca/` (CA cert + key) and `msp/` with `cacerts`, `tlscacerts`, and `config.yaml` (NodeOUs). With NodeOUs enabled, `admincerts/` directories are created but stay **empty** — that is expected; admin status comes from the `OU=admin` in the certificate.
 4. Write `network/configtx.yaml`:
    - Define five `Organizations` entries with correct `MSPDir` paths and `ID` values matching `design.md` §2.1, each with `AnchorPeers` set to its `peer0` (so no separate anchor-peer update is needed)
    - Define `OrdererOrg` with Raft `EtcdRaft` consenters for all three orderers

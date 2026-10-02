@@ -1,1 +1,68 @@
-# Written in Phase 1 (docs/plan.md Phase 1, step 1).
+# cryptogen input — static identities for orderers, peers, and org admins.
+# Doctor/pharmacist/auditor identities are enrolled from Fabric CA in Phase 3;
+# each org's ca/ material generated here becomes that CA's signing root
+# (docs/design.md §2.3).
+#
+# EnableNodeOUs is required on every org: the .peer endorsement policy and
+# the "client" user type depend on it (docs/design.md §2.2).
+#
+# SANS add localhost/127.0.0.1 so CLI tools on the host can reach the
+# published ports over TLS without hostname overrides.
+
+OrdererOrgs:
+  - Name: Orderer
+    Domain: example.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer1
+        SANS: [localhost, 127.0.0.1]
+      - Hostname: orderer2
+        SANS: [localhost, 127.0.0.1]
+      - Hostname: orderer3
+        SANS: [localhost, 127.0.0.1]
+
+PeerOrgs:
+  - Name: HospitalA
+    Domain: hospitala.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS: [localhost, 127.0.0.1]
+    Users:
+      Count: 0
+
+  - Name: HospitalB
+    Domain: hospitalb.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS: [localhost, 127.0.0.1]
+    Users:
+      Count: 0
+
+  - Name: PharmacyX
+    Domain: pharmacyx.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS: [localhost, 127.0.0.1]
+    Users:
+      Count: 0
+
+  - Name: PharmacyY
+    Domain: pharmacyy.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS: [localhost, 127.0.0.1]
+    Users:
+      Count: 0
+
+  - Name: Regulator
+    Domain: regulator.example.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS: [localhost, 127.0.0.1]
+    Users:
+      Count: 0
