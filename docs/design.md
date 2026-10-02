@@ -47,6 +47,68 @@ graph TB
     CC --> NET
 ```
 
+### 1.2 Fabric Concepts Primer
+
+Terms used throughout this design and `plan.md`, explained in the context of MedLedger.
+
+#### Membership Service Provider (MSP)
+
+An **MSP** is how Fabric decides *who belongs to which organization*. It is a folder of certificates, not a running service:
+
+| MSP folder | Contains | Purpose |
+|---|---|---|
+| `cacerts/` | The org's root CA certificate | Any certificate signed by this CA is a member of the org |
+| `tlscacerts/` | The org's TLS root CA certificate | Verifies the org's TLS connections (a separate root from `cacerts/`) |
+| `config.yaml` | NodeOU mapping (below) | Classifies members into roles |
+| `signcerts/` | This identity's own certificate | Local MSPs only — the identity a node or user signs with |
+| `keystore/` | This identity's private key | Local MSPs only — never leaves the owner |
+
+There are two kinds:
+
+- **Channel MSP** — public certificates only (`cacerts`, `tlscacerts`, `config.yaml`), embedded in the channel configuration (`configtx.yaml` `MSPDir`). Every peer uses it to check whether a signature came from a genuine HospitalA member.
+- **Local MSP** — a channel MSP plus `signcerts/` and `keystore/`, held by one peer, orderer, or user (e.g. `users/Admin@hospitala.example.com/msp/`).
+
+Each MSP has an **MSP ID** (`HospitalAMSP`, `PharmacyXMSP`, …). Policies name orgs by MSP ID, and chaincode reads the caller's org with `GetMSPID()`. A forged prescription fails here: its signing certificate does not chain to any hospital's `cacerts`.
+
+#### NodeOUs (Node Organizational Units)
+
+Being a *member* of an org is not enough — HospitalA's peer and HospitalA's doctor must be told apart. **NodeOUs** classify each certificate into a role using the `OU` (Organizational Unit) field of its subject:
+
+| Role | Certificate OU | MedLedger examples |
+|---|---|---|
+| `peer` | `OU=peer` | `peer0.hospitala.example.com` |
+| `orderer` | `OU=orderer` | `orderer1.example.com` |
+| `admin` | `OU=admin` | `Admin@hospitala.example.com` |
+| `client` | `OU=client` | `dr.smith`, `pharm.jones`, `auditor.gov` |
+
+The mapping is switched on by `msp/config.yaml` (`cryptogen` writes it when `EnableNodeOUs: true`; Fabric CA sets the OU from `--id.type`). With NodeOUs, policies can say `HospitalAMSP.peer` — "a peer of HospitalA" — which the endorsement policy (§2.2) depends on. Without NodeOUs only `HospitalAMSP.member` exists, and admins must be listed explicitly in `admincerts/` (which is why those folders exist but stay empty here).
+
+NodeOU roles are coarse: they separate peers from people. The finer doctor/pharmacist/regulator distinction is the `role` attribute embedded in each user's certificate by Fabric CA (`plan.md` Phase 3).
+
+#### Subject Alternative Name (SAN)
+
+A **SAN** is an X.509 certificate extension listing every hostname and IP address the certificate is valid for. When a client opens a TLS connection, it checks that the address it dialled appears in the server certificate's SAN list; otherwise the handshake fails with an error like `x509: certificate is valid for peer0.hospitala.example.com, not localhost`.
+
+Inside the Docker network, containers dial each other by name (`peer0.hospitala.example.com:7051`). CLI tools on the host dial the published port instead (`localhost:7051`). The node certificates therefore carry both: their Docker hostname plus `localhost` and `127.0.0.1` (`SANS:` in `crypto-config.yaml`).
+
+#### Other terms
+
+| Term | Meaning in MedLedger |
+|---|---|
+| **Organization** | An independent participant (HospitalA, PharmacyX, …) with its own CA, MSP, and peer |
+| **Peer** | A node that holds a copy of the ledger, runs chaincode, and endorses transactions — one per org |
+| **Orderer** | A node that puts endorsed transactions into blocks in a single agreed order; three run **Raft** consensus so one can fail |
+| **Channel** | A private ledger shared by a set of orgs — here, `prescription-channel` with all five |
+| **Channel participation API** | The `osnadmin` admin interface used to make orderers join a channel (§2.4) |
+| **Chaincode** | Fabric's term for a smart contract — the Go code enforcing the fraud rules |
+| **Endorsement** | A peer executes a transaction proposal and signs the result; it is not yet on the ledger |
+| **Endorsement policy** | Which orgs' endorsements a transaction needs before it can commit (§2.2) |
+| **Anchor peer** | A peer that other orgs' peers contact to discover the org's peers (gossip) |
+| **World state** | The current value of every key, kept in CouchDB; derived from the blockchain |
+| **Private data collection** | Data stored only on member orgs' peers, with just its hash on the shared ledger (§7) |
+| **Transient data** | Proposal inputs passed to chaincode but never written to the ledger — used for patient fields |
+| **Signing CA vs TLS CA** | Each org has two roots: `ca/` signs identities (MSP), `tlsca/` signs TLS certificates |
+
 ---
 
 ## 2. Network Topology
@@ -515,7 +577,7 @@ Chaincode is specified in **Go** rather than JavaScript. Fabric's Go contract AP
 
 | Host | Docker | Notes |
 |---|---|---|
-| openSUSE Leap 16.0 | Docker Engine from the distro repos | Leap 16 defaults to **SELinux** on fresh installs. If `docker info` lists `selinux` under security options, bind mounts need the `:z` suffix and peers need `security_opt: [label=disable]` to use the Docker socket. Systems using AppArmor need neither. |
+| openSUSE Leap 16.0 | Docker Engine from the distro repos | Leap 16 defaults to **SELinux** on fresh installs; systems upgraded from 15.x often keep AppArmor. The compose file sets `security_opt: [label=disable]` on every container, so bind mounts and the peers' Docker-socket access work under either, with no `:z` relabelling. |
 | Ubuntu 24.04 on Windows 11 WSL2 | Docker Desktop (WSL integration) **or** Docker Engine installed inside WSL | Clone the repo inside the Linux filesystem (`~/…`), never under `/mnt/c` (slow, loses exec bits). `.gitattributes` forces LF on `*.sh`. WSL defaults to half the host RAM (8 GB on a 16 GB machine), which is sufficient; raise it via `%UserProfile%\.wslconfig` if needed. Ports published on `127.0.0.1` in WSL are reachable from Windows browsers. |
 
 Fabric binaries and images are `linux/amd64` and identical on both hosts; the scripts use only `bash`, `jq`, `curl`, and Docker, so no host-specific branches are needed.
@@ -618,6 +680,8 @@ graph TB
 - The API opens one gRPC connection per org peer and submits each user's transactions through **their own org's peer**, as Fabric Gateway expects. The gateway peer then collects the other endorsements the policy needs.
 - Every published port binds to `127.0.0.1` (e.g. `"127.0.0.1:5984:5984"`); nothing is exposed beyond the demo host.
 - Peers mount `/var/run/docker.sock` so they can build and launch chaincode containers.
+- Every container runs with `security_opt: [label=disable]` (SELinux hosts, §6.2).
+- Ledger, CA, and CouchDB data live in Docker volumes, never in the repository; `down.sh` deletes them.
 - Each `ca.<org>` container mounts its org's cryptogen `ca/` directory and uses it as its signing root (§2.3).
 - Orderers start with `ORDERER_GENERAL_BOOTSTRAPMETHOD=none` and `ORDERER_CHANNELPARTICIPATION_ENABLED=true`; ports 7053/8053/9053 serve the `osnadmin` admin API over mutual TLS.
 
@@ -640,6 +704,7 @@ medledger/
 │   ├── crypto-config.yaml
 │   ├── collections_config.json
 │   └── scripts/
+│       ├── common.sh            # shared org/port settings, sourced by the others
 │       ├── generateArtifacts.sh
 │       ├── up.sh
 │       ├── down.sh

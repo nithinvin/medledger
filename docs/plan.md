@@ -15,6 +15,10 @@ Phases 0–3 are infrastructure. Phase 4 is where the actual business logic live
 
 This is a demo project: where a simpler approach does not weaken the fraud-prevention claim, prefer it.
 
+Every shell script (`network/scripts/*.sh`, `demo/*.sh`, `run-demo.sh`) must pass `shellcheck` with no warnings before a phase's exit gate counts as passed.
+
+Fabric terms used below (MSP, NodeOUs, SAN, anchor peer, …) are explained in `design.md` §1.2.
+
 ---
 
 ## Phase 0 — Environment and Scaffolding
@@ -28,6 +32,7 @@ This is a demo project: where a simpler approach does not weaken the fraud-preve
    - Go 1.24+ (host toolchain for unit tests; chaincode itself is compiled inside `fabric-ccenv`)
    - Node.js 22 LTS
    - `jq`, `curl`, `git`
+   - ShellCheck, to lint the shell scripts: `sudo zypper install ShellCheck` (openSUSE) or `sudo apt install shellcheck` (Ubuntu 24.04)
    - On WSL: clone the repository under `~/`, not `/mnt/c`
 2. Download Fabric binaries and Docker images from the repository root (the files are git-ignored):
    ```
@@ -119,9 +124,14 @@ This phase creates five organizations' identities. Getting MSP directory structu
    - Anchor peers are already in the genesis block (Phase 1 step 4)
 7. Execute channel creation.
 
+8. Put shared settings (org list, ports, MSP IDs, the `set_peer_env <org>` helper that points the host `peer` CLI at an org's peer as its Admin) in `network/scripts/common.sh`, sourced by every network script.
+
 ### Host notes
-- **openSUSE Leap 16.0:** if `docker info --format '{{.SecurityOptions}}'` includes `selinux`, add `:z` to bind mounts and `security_opt: [label=disable]` to peers (Docker socket access). AppArmor hosts need nothing.
+- **openSUSE Leap 16.0:** the compose file sets `security_opt: [label=disable]` on every container, so SELinux hosts need no `:z` relabelling and peers can reach the Docker socket. It is a no-op on AppArmor hosts.
 - **WSL2:** nothing extra; `127.0.0.1` ports are reachable from Windows.
+
+### Expected log noise
+While peers join one by one, each logs a few `gossip.comm ... Authentication failed: failed classifying identity` errors for peers that have not joined yet. They stop within a second or two of the last join; persistent ones mean an MSP problem.
 
 ### Exit gate
 - `docker ps` shows 18 running containers (3 orderers, 5 peers, 5 CouchDBs, 5 CAs)
