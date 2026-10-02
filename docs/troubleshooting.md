@@ -11,6 +11,7 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 | Chaincode build fails with a Go toolchain/version error | `go.mod` `go` directive is newer than `fabric-ccenv`'s Go | Keep the pins in [architecture.md](design/architecture.md#technology-stack-and-versions); never `go get …@latest` for the contract API |
 | Scripts fail with `$'\r': command not found` on WSL | CRLF line endings from a Windows-side checkout | Clone inside the WSL filesystem; `.gitattributes` forces LF on `*.sh` |
 | Bind mounts or Docker socket denied on openSUSE | SELinux enforcing | Every compose service already sets `label=disable`; check it was not removed |
+| Chaincode build fails with `lookup proxy.golang.org: i/o timeout` | The build container has no DNS (seen on Docker's default bridge on this host) | Vendor modules before packaging (`go mod vendor`); `deployChaincode.sh` does this ([D16](decisions.md)) |
 
 ## Crypto Material and Channel
 

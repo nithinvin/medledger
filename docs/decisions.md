@@ -17,5 +17,8 @@ Architectural decisions and the alternatives rejected. Append new decisions with
 | D11 | Generic control classes + embedded jurisdiction profile (India default) | Hard-coded US DEA schedules | Same rules serve any country; profile changes go through chaincode-upgrade governance |
 | D12 | API-generated salt in private payload | Plain hash of patient fields | Prevents dictionary reversal of the public hash; randomness stays out of chaincode |
 | D13 | R4/R7 split by same vs. different pharmacy | Two overlapping time windows | Makes both rules reachable and gives pharmacy shopping its own rule ID |
+| D14 | Each role is accepted only from its org type (doctor ← hospitals, pharmacist ← pharmacies, regulator ← Regulator) | Trust the `role` attribute alone | Every org runs its own CA, so the attribute is self-asserted; a pharmacy's CA could otherwise mint a "doctor" |
+| D15 | Fraud rules and status as pure functions in `rules/`; contracts only gather state | Rules inline in contract handlers | Every rule unit-tested without a ledger; one state-gathering path for the real check and the eligibility dry run |
+| D16 | Vendor Go modules before packaging chaincode | Let the peer's build container download modules | The build container has no network access on some hosts (DNS fails on Docker's default bridge); vendoring makes the build offline and reproducible |
 
 > **On D6:** CouchDB rich queries (`GetQueryResult`) are evaluated during simulation but **not** re-evaluated at validation time, so results can be stale by commit time. They are safe for read-only query functions, and unsafe inside functions that write state based on their results. Core fraud checks therefore use deterministic composite-key range queries.

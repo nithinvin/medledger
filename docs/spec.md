@@ -96,6 +96,8 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 
 **Authority separation rule (hard requirement):** A doctor identity invoking a fulfillment function must be rejected by chaincode. A pharmacist identity invoking an issuance function must be rejected by chaincode. Rejection occurs at endorsement time, before any ledger write.
 
+**Role–organization binding:** A role is valid only from its organization type in the table above — a `doctor` certificate issued by a pharmacy's CA is rejected, and likewise for the other roles.
+
 **Identity uniqueness:** A person is identified by the pair *(MSP ID, certificate common name)*. A common name alone is not unique — `dr.smith` may exist at both hospitals.
 
 ---

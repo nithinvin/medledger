@@ -21,6 +21,7 @@ The API serves plain HTTP on `localhost:3000` and the web UI on `localhost:5173`
 
 - One gRPC connection with TLS **per org peer**; each user connects through their own org's peer, as Fabric Gateway expects. The gateway peer then collects the other endorsements the policy needs.
 - Identity and signer from `identities.js`
+- Contract handles per [Invoking Functions](chaincode.md#invoking-functions): default contract for `PrescriptionContract`, named contracts for the others
 - Expose `submit(fn, args, transient)` and `evaluate(fn, args)` helpers
 
 ### Authentication
@@ -46,11 +47,19 @@ The API serves plain HTTP on `localhost:3000` and the web UI on `localhost:5173`
 
 ### Error Mapping
 
-Chaincode rejections carry the rule ID (e.g. `R1: fulfillment limit reached`). Map these to HTTP 403 with the rule ID in the response body so the UI can display which fraud rule fired.
+Chaincode rejections start with a code ([Error Codes](chaincode.md#error-codes)), e.g. `R1: fulfillment limit reached`. Map the code to an HTTP status and return it in the response body so the UI can show which rule fired:
+
+| Code | HTTP |
+|---|---|
+| `R1`–`R7`, `UNAUTHORIZED` | 403 |
+| `INVALID_ARGUMENT` | 400 |
+| `NOT_FOUND` | 404 |
+| `ALREADY_EXISTS` | 409 |
+| `INTERNAL`, anything unrecognized | 500 |
 
 ### Transient Data and Salt
 
-Patient fields must be sent as **transient data**, base64-encoded, never as regular chaincode arguments. The API generates the salt per prescription with `crypto.randomBytes(32)` and adds it to the transient map ([Private Data](chaincode.md#private-data)).
+Patient fields must be sent as **transient data**, base64-encoded, never as regular chaincode arguments. The API generates the salt per prescription with `crypto.randomBytes(32).toString('hex')` (64 hex characters; chaincode requires ≥ 32) and adds it to the transient map ([Private Data](chaincode.md#private-data)).
 
 ## Web UI
 

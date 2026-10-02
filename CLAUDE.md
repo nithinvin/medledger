@@ -19,6 +19,7 @@ The constitution below is binding for all code, architecture, refactoring, and a
 |---|---|
 | Lint shell scripts | `shellcheck network/scripts/*.sh` |
 | Check doc links | `node scripts/check-doc-links.mjs` |
+| Chaincode tests / lint | `cd chaincode/medledger && go test ./...` — full gate list in `docs/runbook.md#chaincode-development` |
 | Network lifecycle | `network/scripts/{generateArtifacts,up,createChannel,down}.sh` |
 | Point `peer` CLI at an org | `source network/scripts/common.sh && set_peer_env <org>` |
 

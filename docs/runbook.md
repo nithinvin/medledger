@@ -82,6 +82,18 @@ set_peer_env hospitala dr.smith   # as a demo user (after enrollUsers.sh)
 peer channel list
 ```
 
+## Chaincode Development
+
+Run from `chaincode/medledger/`:
+
+| Task | Command |
+|---|---|
+| Unit tests | `go test ./...` (add `-cover` for coverage) |
+| Format check | `gofmt -l .` (must print nothing) |
+| Vet | `go vet ./...` |
+| Lint (no host install) | `docker run --rm -v "$PWD":/app -v "$(go env GOMODCACHE)":/go/pkg/mod -w /app golangci/golangci-lint:v2.14.0 golangci-lint run ./...` |
+| Determinism grep | `grep -rn "time.Now()\|rand\.\|os.Getenv\|os.ReadFile\|math/rand\|GetQueryResult" --include=*.go . \| grep -v _test.go` |
+
 ## One-Command Startup
 
 *Available after Phase 8.* `run-demo.sh` at the repository root runs the whole sequence:

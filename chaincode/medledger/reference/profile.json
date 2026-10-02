@@ -1,1 +1,39 @@
-{}
+{
+  "jurisdiction": "IN",
+  "note": "Illustrative demo data, not legal guidance. Verify against current NDPS Act and Drugs and Cosmetics Rules schedules before any real use.",
+  "controlClasses": {
+    "NDPS": {
+      "legalBasis": "Narcotic drugs and psychotropic substances, NDPS Act 1985",
+      "maxRefills": 0,
+      "minRefillIntervalDays": 0
+    },
+    "SCHEDULE_X": {
+      "legalBasis": "Schedule X, Drugs and Cosmetics Rules 1945",
+      "maxRefills": 0,
+      "minRefillIntervalDays": 0
+    },
+    "SCHEDULE_H1": {
+      "legalBasis": "Schedule H1, Drugs and Cosmetics Rules 1945",
+      "maxRefills": 2,
+      "minRefillIntervalDays": 20
+    },
+    "SCHEDULE_H": {
+      "legalBasis": "Schedule H (prescription-only), Drugs and Cosmetics Rules 1945",
+      "maxRefills": 5,
+      "minRefillIntervalDays": 15
+    },
+    "NONE": {
+      "legalBasis": "Not prescription-controlled",
+      "maxRefills": 11,
+      "minRefillIntervalDays": 0
+    }
+  },
+  "drugs": [
+    { "drugCode": "IN-MORPH-10", "drugName": "Morphine sulfate 10 mg tablet", "controlClass": "NDPS" },
+    { "drugCode": "IN-FENT-25", "drugName": "Fentanyl 25 mcg/h transdermal patch", "controlClass": "NDPS" },
+    { "drugCode": "IN-MPH-10", "drugName": "Methylphenidate 10 mg tablet", "controlClass": "SCHEDULE_X" },
+    { "drugCode": "IN-CEFX-200", "drugName": "Cefixime 200 mg tablet", "controlClass": "SCHEDULE_H1" },
+    { "drugCode": "IN-AMOX-500", "drugName": "Amoxicillin 500 mg capsule", "controlClass": "SCHEDULE_H" },
+    { "drugCode": "IN-PARA-500", "drugName": "Paracetamol 500 mg tablet", "controlClass": "NONE" }
+  ]
+}

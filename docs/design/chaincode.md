@@ -59,6 +59,52 @@ GetDrugReference(ctx)                              // jurisdiction profile, for 
 
 Patient-identifying fields are passed via the **transient data map**, not as ordinary arguments. Ordinary arguments are written into the transaction proposal and therefore onto the blockchain of every org; transient data is not.
 
+### Invoking Functions
+
+`PrescriptionContract` is registered first, so it is the default contract and its functions are invoked by bare name (`IssuePrescription`). The others need their contract name: `FulfillmentContract:RecordFulfillment`, `QueryContract:GetPrescriptionStatus`. With `@hyperledger/fabric-gateway`, use `network.getContract('medledger', 'FulfillmentContract')`.
+
+### Authorization
+
+Every function calls `RequireRole` first. A role is accepted only from the organization type allowed to hold it: `doctor` from HospitalA/HospitalB, `pharmacist` from PharmacyX/PharmacyY, `regulator` from Regulator ([D14](../decisions.md)). Each org runs its own CA, so without this binding a pharmacy's CA could mint a "doctor".
+
+| Function | doctor | pharmacist | regulator |
+|---|---|---|---|
+| `IssuePrescription` | ✅ | — | — |
+| `RevokePrescription` | ✅ issuer only (same MSP **and** CN) | — | — |
+| `ReadPrescription` | ✅ | ✅ | ✅ |
+| `ReadPatientData` | ✅ | ✅ | — |
+| `RecordFulfillment` | — | ✅ | — |
+| `GetFulfillments` | ✅ | ✅ | ✅ |
+| `GetPrescriptionStatus` | ✅ | ✅ | ✅ |
+| `GetPrescriptionHistory` | — | — | ✅ |
+| `GetPrescriptionsByDoctor` | ✅ own only | — | ✅ any doctor |
+| `CheckFulfillmentEligibility` | — | ✅ | — |
+| `GetDrugReference` | ✅ | ✅ | ✅ |
+
+### Error Codes
+
+Every rejection is an `errs.Error` whose message starts with a code, e.g. `R1: fulfillment limit reached: 1 of 1 fills used`. The API maps the code to an HTTP status ([Error Mapping](application.md#error-mapping)).
+
+| Code | Meaning |
+|---|---|
+| `R1`–`R7` | A fraud rule rejected the request ([spec FR-4](../spec.md#fr-4--fraud-rules)) |
+| `UNAUTHORIZED` | Wrong role, role not valid for the caller's org, or not the issuing doctor |
+| `INVALID_ARGUMENT` | Malformed input: non-UUID ID, non-positive quantity, unknown drug code, bad transient data, … |
+| `NOT_FOUND` | No such prescription (or no private data on this peer) |
+| `ALREADY_EXISTS` | Duplicate prescription ID, or already revoked |
+| `INTERNAL` | Ledger/encoding failure, or private data that no longer matches its public hash |
+
+### Input Limits
+
+| Input | Rule |
+|---|---|
+| `prescriptionId` | Canonical UUID (8-4-4-4-12 hex) |
+| `quantity`, `quantityDispensed`, `quantityRequested`, `validityDays` | > 0; `validityDays` ≤ 365 |
+| `refillsAllowed` | ≥ 0 and ≤ the control class's `maxRefills` (R6) |
+| Free text (`dosageInstructions`, `reason`, `patientName`, `patientRef`) | Non-empty, ≤ 500 characters |
+| `patientDOB` | `YYYY-MM-DD` |
+| `salt` | Hex, ≥ 32 characters (16 bytes) |
+
 ## Function Behaviour
 
 What each function must do, in order. Rule IDs (R1–R7) are defined in the [spec](../spec.md#fr-4--fraud-rules); package layout is in the [repository structure](../README.md#repository-structure).
@@ -82,6 +128,8 @@ What each function must do, in order. Rule IDs (R1–R7) are defined in the [spe
   func GetMSPID(ctx contractapi.TransactionContextInterface) (string, error)
   func RequireRole(ctx contractapi.TransactionContextInterface, role string) error
   ```
+- `errs/errs.go` — the coded error type and code constants ([Error Codes](#error-codes)).
+- `rules/fraud.go`, `rules/status.go` — R1–R7 and status derivation as **pure functions** over already-loaded records, so every rule is unit-tested without a ledger. `contracts/ledger.go` gathers the state once (`buildFulfillmentRequest`) for both `RecordFulfillment` and `CheckFulfillmentEligibility`, so the dry run can never disagree with the real check.
 - `utils/timestamp.go`:
   ```go
   func TxTime(ctx contractapi.TransactionContextInterface) (time.Time, error)
@@ -98,9 +146,9 @@ What each function must do, in order. Rule IDs (R1–R7) are defined in the [spe
 - Validate `quantity > 0`, `validityDays > 0`, `refillsAllowed >= 0`
 - Read `patientName`, `patientDOB`, `patientRef`, `salt` from `ctx.GetStub().GetTransient()`; reject if any is missing or `salt` is shorter than 32 hex chars
 - Compute SHA-256 over the canonical private payload, store the hash on the public record
-- `PutPrivateData("patientDataCollection", ...)` for the patient payload
+- `PutPrivateData("patientDataCollection", prescriptionId, ...)` for the patient payload (private key = the prescription ID)
 - `PutState` the public prescription record
-- Write doctor index key `DOCIDX~{doctorMSP}~{doctorId}~{prescriptionId}`
+- Write doctor index key `DOCIDX~{doctorMSP}~{doctorId}~{prescriptionId}` with a one-byte placeholder value (an empty value would be a delete in Fabric)
 
 `RevokePrescription`:
 - `RequireRole(ctx, "doctor")`
@@ -108,7 +156,7 @@ What each function must do, in order. Rule IDs (R1–R7) are defined in the [spe
 - Reject if revocation already exists
 - Append revocation record — **never modify the prescription**
 
-`ReadPrescription`, `ReadPatientData` — plain reads (the latter from the private collection).
+`ReadPrescription` — plain read. `ReadPatientData` — reads the private collection and rejects data whose SHA-256 no longer matches the public `patientDataHash` (tamper evidence).
 
 ### FulfillmentContract
 
@@ -122,7 +170,7 @@ What each function must do, in order. Rule IDs (R1–R7) are defined in the [spe
 - Let `interval = ClassLimits(controlClass).minRefillIntervalDays`; if `interval > 0` and the latest fulfillment is less than `interval` days old:
   - R4: reject if it came from the caller's pharmacy MSP
   - R7: reject if it came from a different pharmacy MSP
-- Append fulfillment record at sequence = current count
+- Append fulfillment record at sequence = current count (zero-padded to 4 digits in the key so range queries return numeric order)
 - **Must contain no `PutState` call targeting a `PRESC~` key**
 
 `GetFulfillments` — deterministic partial composite key range query.

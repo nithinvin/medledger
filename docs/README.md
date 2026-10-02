@@ -66,15 +66,22 @@ medledger/
 │       ├── go.mod
 │       ├── main.go
 │       ├── contracts/
+│       │   ├── ledger.go           # shared state access
+│       │   ├── validate.go         # input validation
 │       │   ├── prescription.go
 │       │   ├── fulfillment.go
 │       │   └── query.go
+│       ├── main_test.go            # contract metadata validation
+│       ├── errs/
+│       │   └── errs.go             # coded errors (R1–R7, UNAUTHORIZED, …)
 │       ├── models/
 │       │   ├── prescription.go
 │       │   ├── fulfillment.go
-│       │   └── revocation.go
+│       │   ├── revocation.go
+│       │   └── views.go            # status values, history/eligibility views
 │       ├── rules/
-│       │   └── fraud.go
+│       │   ├── fraud.go            # R1–R7 as pure functions
+│       │   └── status.go           # status derivation
 │       ├── reference/
 │       │   ├── profile.go          # go:embed loader
 │       │   └── profile.json        # jurisdiction profile (India default)
@@ -82,7 +89,8 @@ medledger/
 │       │   ├── keys.go
 │       │   ├── identity.go
 │       │   └── timestamp.go
-│       └── contracts/*_test.go
+│       ├── internal/mock/          # in-memory ledger, test-only
+│       └── */*_test.go
 ├── api/
 │   ├── package.json
 │   ├── src/

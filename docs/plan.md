@@ -13,9 +13,9 @@
 | 0 | Environment and Scaffolding | M1 — Network live | ✅ Done | `d63fe85` |
 | 1 | Cryptographic Material and Organizations | M1 | ✅ Done | `501e3a1` |
 | 2 | Network Bring-Up | M1 | ✅ Done | `badf573` |
-| 3 | Identity Enrollment | M1 | ✅ Done | *(next commit)* |
-| 4 | Chaincode Implementation | M2 — Contract working | ⏳ Next | — |
-| 5 | Chaincode Deployment | M2 | — | — |
+| 3 | Identity Enrollment | M1 | ✅ Done | `64667cf` |
+| 4 | Chaincode Implementation | M2 — Contract working | ✅ Done | *(next commit)* |
+| 5 | Chaincode Deployment | M2 | ⏳ Next | — |
 | 6 | API Gateway | M3 — Application layer | — | — |
 | 7 | Web UI | M3 | — | — |
 | 8 | Demo Scenarios and Documentation | M4 — Demo ready | — | — |
@@ -164,7 +164,7 @@ Update this table when a phase's exit gate passes.
 
 **Goal:** All business and fraud logic, unit-tested before it touches the network. **This is the core phase.**
 
-**Deliverables:** Everything under `chaincode/medledger/` — `models/`, `reference/`, `utils/`, `rules/`, `contracts/`, `main.go`, and `*_test.go`.
+**Deliverables:** Everything under `chaincode/medledger/` — `models/`, `reference/`, `utils/`, `errs/`, `rules/`, `contracts/`, `main.go`, `internal/mock/` (test-only in-memory ledger), and `*_test.go`.
 
 **Steps:**
 1. Implement models, the embedded jurisdiction profile, and utilities per [Models, Reference Data, and Utilities](design/chaincode.md#models-reference-data-and-utilities).
@@ -191,7 +191,8 @@ Update this table when a phase's exit gate passes.
    `GetQueryResult` is acceptable only inside read-only query functions, never in `IssuePrescription`, `RecordFulfillment`, or `RevokePrescription`. Reference data must come from `go:embed`, never `os.ReadFile`.
 
 **Exit gate:**
-- All unit tests pass; `gofmt`, `go vet`, `golangci-lint` clean (`CONSTITUTION.md` Quality Gates)
+- All unit tests pass; `gofmt`, `go vet`, `golangci-lint` clean (`CONSTITUTION.md` Quality Gates; commands in the [runbook](runbook.md#chaincode-development))
+- `contractapi.NewChaincode` accepts every contract (metadata test), so deployment will not fail on signatures
 - Determinism grep returns no violations in state-mutating functions
 - Code review confirms `RecordFulfillment` never writes a `PRESC~` key
 
@@ -206,7 +207,7 @@ Update this table when a phase's exit gate passes.
 **Steps:**
 1. Write `network/collections_config.json` per [Private Data](design/chaincode.md#private-data).
 2. Write `network/scripts/deployChaincode.sh` performing the Fabric 2.x lifecycle:
-   - `go mod vendor` in `chaincode/medledger` (the peer's build container then needs no network access to fetch modules)
+   - `go mod vendor` in `chaincode/medledger` — **required**: the peer's build container may have no network access ([D16](decisions.md)); a vendored build was verified offline in `fabric-ccenv:2.5.16` during Phase 4
    - `peer lifecycle chaincode package medledger.tar.gz --path ../chaincode/medledger --lang golang --label medledger_1.0`
    - `peer lifecycle chaincode install` on all five peers
    - `peer lifecycle chaincode queryinstalled` to capture the package ID
