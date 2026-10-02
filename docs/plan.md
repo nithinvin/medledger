@@ -13,8 +13,8 @@
 | 0 | Environment and Scaffolding | M1 — Network live | ✅ Done | `d63fe85` |
 | 1 | Cryptographic Material and Organizations | M1 | ✅ Done | `501e3a1` |
 | 2 | Network Bring-Up | M1 | ✅ Done | `badf573` |
-| 3 | Identity Enrollment | M1 | ⏳ Next | — |
-| 4 | Chaincode Implementation | M2 — Contract working | — | — |
+| 3 | Identity Enrollment | M1 | ✅ Done | *(next commit)* |
+| 4 | Chaincode Implementation | M2 — Contract working | ⏳ Next | — |
 | 5 | Chaincode Deployment | M2 | — | — |
 | 6 | API Gateway | M3 — Application layer | — | — |
 | 7 | Web UI | M3 | — | — |
@@ -140,7 +140,7 @@ Update this table when a phase's exit gate passes.
    fabric-ca-client register --id.name dr.smith --id.secret <pw> --id.type client \
      --id.attrs 'role=doctor:ecert' --tls.certfiles <ca-tls-cert>
    ```
-4. Enroll each user, producing their MSP directory, and copy the org's `msp/config.yaml` into it (NodeOUs).
+4. Enroll each user into `organizations/peerOrganizations/<org>/users/<user>@<org>/msp`. Copy in the org's `msp/config.yaml` (NodeOUs) and replace `cacerts/` with the org's `msp/cacerts/` file — the same root, but under the filename `config.yaml` references.
 5. Write `network/scripts/enrollUsers.sh` automating all of the above idempotently.
 6. Verify attribute embedding — the attribute OID payload should contain `"role":"doctor"`:
    ```
@@ -155,6 +155,7 @@ Update this table when a phase's exit gate passes.
 - Five user identities enrolled with MSP directories present
 - `role` attribute confirmed present in each enrollment certificate
 - `openssl verify` succeeds for each user against its org MSP's `cacerts`
+- Each user is accepted by its org's peer (`peer channel getinfo` as that user)
 - `enrollUsers.sh` runs cleanly against a freshly created network
 
 ---

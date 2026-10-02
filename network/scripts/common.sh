@@ -29,6 +29,20 @@ declare -A CA_PORT=(
   [hospitala]=7054 [hospitalb]=8054 [pharmacyx]=9054 [pharmacyy]=10054 [regulator]=11054
 )
 
+# Demo users (docs/runbook.md#demo-accounts): enrolled from each org's Fabric CA
+# with a `role` attribute embedded in the certificate (Phase 3).
+DEMO_USERS=(dr.smith dr.patel pharm.jones pharm.lee auditor.gov)
+declare -A USER_ORG=(
+  [dr.smith]=hospitala [dr.patel]=hospitalb
+  [pharm.jones]=pharmacyx [pharm.lee]=pharmacyy
+  [auditor.gov]=regulator
+)
+declare -A USER_ROLE=(
+  [dr.smith]=doctor [dr.patel]=doctor
+  [pharm.jones]=pharmacist [pharm.lee]=pharmacist
+  [auditor.gov]=regulator
+)
+
 ORDERERS=(orderer1 orderer2 orderer3)
 declare -A ORDERER_PORT=([orderer1]=7050 [orderer2]=8050 [orderer3]=9050)
 declare -A ORDERER_ADMIN_PORT=([orderer1]=7053 [orderer2]=8053 [orderer3]=9053)
@@ -54,14 +68,21 @@ require_artifacts() {
     || die "crypto material or channel block missing — run network/scripts/generateArtifacts.sh"
 }
 
-# Point the host `peer` CLI at an org's peer, acting as that org's Admin.
+# MSP directory of an org user: user_msp_dir <org> <user>  (user: Admin, dr.smith, ...)
+user_msp_dir() {
+  echo "$ORG_DIR/peerOrganizations/${1}.example.com/users/${2}@${1}.example.com/msp"
+}
+
+# Point the host `peer` CLI at an org's peer, acting as that org's Admin, or as
+# a demo user when given: set_peer_env <org> [user]
 set_peer_env() {
-  local org="$1"
+  local org="$1" user="${2:-Admin}"
   local org_path="$ORG_DIR/peerOrganizations/${org}.example.com"
   export CORE_PEER_TLS_ENABLED=true
   export CORE_PEER_LOCALMSPID="${ORG_MSP[$org]}"
   export CORE_PEER_TLS_ROOTCERT_FILE="$org_path/tlsca/tlsca.${org}.example.com-cert.pem"
-  export CORE_PEER_MSPCONFIGPATH="$org_path/users/Admin@${org}.example.com/msp"
+  CORE_PEER_MSPCONFIGPATH="$(user_msp_dir "$org" "$user")"
+  export CORE_PEER_MSPCONFIGPATH
   export CORE_PEER_ADDRESS="localhost:${PEER_PORT[$org]}"
 }
 

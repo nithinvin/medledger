@@ -55,7 +55,7 @@ Every port binds to `127.0.0.1` only. Credentials are fixed demo values ([spec X
 |---|---|---|---|
 | Orderers | `orderer1`–`orderer3.example.com` | 7050 / 8050 / 9050; admin API 7053 / 8053 / 9053 | Mutual TLS (orderer Admin cert) |
 | Peers | `peer0.<org>.example.com` | hospitala 7051, hospitalb 8051, pharmacyx 9051, pharmacyy 10051, regulator 11051 | TLS; org Admin MSP for CLI |
-| Fabric CAs | `ca.<org>.example.com` | 7054 / 8054 / 9054 / 10054 / 11054 (same org order) | `admin` / `adminpw` |
+| Fabric CAs | `ca.<org>.example.com` | 7054 / 8054 / 9054 / 10054 / 11054 (same org order) | `admin` / `adminpw`; demo users enroll with `<username>pw` |
 | CouchDB | `couchdb-a`, `-b`, `-x`, `-y`, `-r` | 5984 / 6984 / 7984 / 8984 / 9984 — UI at `/_utils` | `admin` / `adminpw` |
 | API gateway | — | 3000 | Demo logins ([Demo Accounts](#demo-accounts)) |
 | Web UI | — | 5173 | Demo logins |
@@ -69,7 +69,7 @@ Run from the repository root. Each is idempotent unless noted.
 | 1 | `network/scripts/generateArtifacts.sh` | Regenerate crypto material and the channel genesis block. Refuses to run while the network is up. | ✅ |
 | 2 | `network/scripts/up.sh` | Start the 18 containers and wait until each answers | ✅ |
 | 3 | `network/scripts/createChannel.sh` | Join orderers (`osnadmin`) and peers to `prescription-channel` | ✅ |
-| 4 | `network/scripts/enrollUsers.sh` | Register and enroll the five demo users | Phase 3 |
+| 4 | `network/scripts/enrollUsers.sh` | Register and enroll the five demo users, then verify each certificate and that its peer accepts it | ✅ |
 | 5 | `network/scripts/deployChaincode.sh` | Package, install, approve, and commit chaincode | Phase 5 |
 | — | `network/scripts/down.sh` | Remove containers, volumes, and `dev-peer*` chaincode containers/images. Keeps crypto material. | ✅ |
 
@@ -77,7 +77,8 @@ Run from the repository root. Each is idempotent unless noted.
 
 ```bash
 source network/scripts/common.sh
-set_peer_env hospitala
+set_peer_env hospitala            # as the org Admin
+set_peer_env hospitala dr.smith   # as a demo user (after enrollUsers.sh)
 peer channel list
 ```
 
@@ -124,7 +125,7 @@ echo "  CouchDB: http://localhost:5984/_utils"
 
 ## Demo Accounts
 
-*Available after Phase 3.*
+Enrolled by `enrollUsers.sh`. Each user's MSP (certificate + private key) is at `network/organizations/peerOrganizations/<org>.example.com/users/<username>@<org>.example.com/msp`.
 
 | Username | Org | Role |
 |---|---|---|

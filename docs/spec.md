@@ -81,7 +81,7 @@ The demo ships with an **India** profile, reflecting the NDPS Act, 1985 (enforce
 | X6 | Patient-facing mobile application | Not required for the core fraud-prevention claim |
 | X7 | HTTPS for the REST API and web UI | Demo is served on `http://localhost` only; all Fabric connections still use TLS |
 | X8 | Live national drug databases | A static profile file is sufficient for the demo |
-| X9 | Secret management for infrastructure credentials | CouchDB and Fabric CA bootstrap admins use fixed, well-known demo passwords (`admin`/`adminpw`); acceptable only because every port binds to `127.0.0.1` |
+| X9 | Secret management for infrastructure credentials | CouchDB and Fabric CA bootstrap admins use fixed, well-known demo passwords (`admin`/`adminpw`), and demo users enroll with `<username>pw`; acceptable only because every port binds to `127.0.0.1` |
 
 ---
 

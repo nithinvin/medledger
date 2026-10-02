@@ -12,7 +12,8 @@ Install the prerequisites per the [runbook](docs/runbook.md#install), then from 
 network/scripts/generateArtifacts.sh   # crypto material + channel genesis block
 network/scripts/up.sh                  # start the 18 containers
 network/scripts/createChannel.sh       # join orderers and peers to prescription-channel
+network/scripts/enrollUsers.sh         # enroll the five demo users
 network/scripts/down.sh                # tear everything down
 ```
 
-The full demo (users, chaincode, API, web UI) arrives in later phases — see [plan status](docs/plan.md#status).
+The full demo (chaincode, API, web UI) arrives in later phases — see [plan status](docs/plan.md#status).

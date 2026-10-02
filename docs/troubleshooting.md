@@ -46,3 +46,5 @@ These look like errors but are normal:
 |---|---|---|
 | `gossip.comm ... Authentication failed: failed classifying identity` | During `createChannel.sh`, for a second or two | A peer gossips with peers not yet on the channel, whose MSPs it cannot classify yet. Persistent occurrences after all peers joined mean an MSP problem. |
 | CouchDB messages about missing `_users` database | CouchDB start-up | Single-node CouchDB without system databases; Fabric does not need them |
+| `WARN [msp] loadCertificateAt -> Failed loading ...OU certificate` | Host CLI using a user MSP whose `cacerts/` filename differs from `config.yaml` | Peers classify identities with the channel MSP, so requests still succeed. `enrollUsers.sh` renames the file to avoid the warning. |
+| `enrollUsers.sh` registers every user again | After `down.sh` | `down.sh` deletes the CA databases with the volumes; re-registration is expected |
