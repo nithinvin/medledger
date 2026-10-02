@@ -5,7 +5,10 @@
 //   - writes are buffered per transaction and committed only on success,
 //     so a rejected transaction leaves no trace;
 //   - reads see committed state, not the transaction's own pending writes;
-//   - every committed write is appended to the key's history.
+//   - every committed write is appended to the key's history;
+//   - JSON values come back re-serialized with sorted keys, as Fabric's
+//     CouchDB state database returns them — never byte-identical to what
+//     was written, so code must not hash or compare raw stored bytes.
 //
 // Stub methods the contracts do not use are left unimplemented (calling one
 // panics via the embedded nil interface), so accidental use is loud.
@@ -14,6 +17,7 @@ package mock
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -139,6 +143,20 @@ type Stub struct {
 	privWrites map[string]map[string][]byte
 }
 
+// couchDBRoundTrip mimics CouchDB storage: valid JSON is decoded and
+// re-encoded (Go sorts map keys); other bytes are stored as-is.
+func couchDBRoundTrip(value []byte) []byte {
+	var doc any
+	if json.Unmarshal(value, &doc) != nil {
+		return value
+	}
+	normalized, err := json.Marshal(doc)
+	if err != nil {
+		return value
+	}
+	return normalized
+}
+
 func (s *Stub) commit() {
 	keys := make([]string, 0, len(s.writes))
 	for k := range s.writes {
@@ -146,9 +164,10 @@ func (s *Stub) commit() {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		s.ledger.state[k] = s.writes[k]
+		stored := couchDBRoundTrip(s.writes[k])
+		s.ledger.state[k] = stored
 		s.ledger.history[k] = append(s.ledger.history[k], &queryresult.KeyModification{
-			TxId: s.txID, Value: s.writes[k], Timestamp: s.timestamp,
+			TxId: s.txID, Value: stored, Timestamp: s.timestamp,
 		})
 	}
 	for coll, kv := range s.privWrites {
@@ -156,7 +175,7 @@ func (s *Stub) commit() {
 			s.ledger.private[coll] = map[string][]byte{}
 		}
 		for k, v := range kv {
-			s.ledger.private[coll][k] = v
+			s.ledger.private[coll][k] = couchDBRoundTrip(v)
 		}
 	}
 }

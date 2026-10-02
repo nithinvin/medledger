@@ -28,6 +28,12 @@ Versions below are pinned in [architecture.md](design/architecture.md#technology
      |---|---|
      | openSUSE Leap 16.0 | `sudo zypper install ShellCheck` |
      | Ubuntu 24.04 | `sudo apt install shellcheck` |
+   - golangci-lint **v2.14.0**, to lint the chaincode. Use the official binary on both hosts — distro packages are too old (openSUSE's `golangci-lint` 1.60.3 fails on Go 1.24 code with `unsupported version: 2`):
+     ```
+     curl -sSfL https://golangci-lint.run/install.sh | sudo sh -s -- -b /usr/local/bin v2.14.0
+     golangci-lint version   # reports 2.14.0
+     ```
+     No install at all also works: use the Docker command in [Chaincode Development](#chaincode-development).
    - On WSL: clone the repository under `~/`, not `/mnt/c`
 2. Download Fabric binaries and Docker images from the repository root (the files are git-ignored):
    ```
@@ -70,8 +76,11 @@ Run from the repository root. Each is idempotent unless noted.
 | 2 | `network/scripts/up.sh` | Start the 18 containers and wait until each answers | ✅ |
 | 3 | `network/scripts/createChannel.sh` | Join orderers (`osnadmin`) and peers to `prescription-channel` | ✅ |
 | 4 | `network/scripts/enrollUsers.sh` | Register and enroll the five demo users, then verify each certificate and that its peer accepts it | ✅ |
-| 5 | `network/scripts/deployChaincode.sh` | Package, install, approve, and commit chaincode | Phase 5 |
+| 5 | `network/scripts/deployChaincode.sh` | Vendor, package, install on 5 peers, approve for 5 orgs, commit (~2 min: each peer compiles the chaincode) | ✅ |
+| 6 | `network/scripts/smokeTest.sh` | End-to-end check with the demo users: issue, fulfill, R1 at a second pharmacy, history = 1, privacy (12 checks, repeatable) | ✅ |
 | — | `network/scripts/down.sh` | Remove containers, volumes, and `dev-peer*` chaincode containers/images. Keeps crypto material. | ✅ |
+
+**Upgrading chaincode** after a code change: bump the version and the sequence together, e.g. `CC_VERSION=1.1 CC_SEQUENCE=2 network/scripts/deployChaincode.sh`. Rerunning with an already-committed sequence is a no-op. After `down.sh`, start again from `CC_SEQUENCE=1` (the default).
 
 `network/scripts/common.sh` holds shared settings and is sourced by the others. To point the host `peer` CLI at an org's peer as its Admin:
 
@@ -91,7 +100,8 @@ Run from `chaincode/medledger/`:
 | Unit tests | `go test ./...` (add `-cover` for coverage) |
 | Format check | `gofmt -l .` (must print nothing) |
 | Vet | `go vet ./...` |
-| Lint (no host install) | `docker run --rm -v "$PWD":/app -v "$(go env GOMODCACHE)":/go/pkg/mod -w /app golangci/golangci-lint:v2.14.0 golangci-lint run ./...` |
+| Lint | `golangci-lint run ./...` (v2.14.0) |
+| Lint without a host install | `docker run --rm -v "$PWD":/app -v "$(go env GOMODCACHE)":/go/pkg/mod -w /app golangci/golangci-lint:v2.14.0 golangci-lint run ./...` |
 | Determinism grep | `grep -rn "time.Now()\|rand\.\|os.Getenv\|os.ReadFile\|math/rand\|GetQueryResult" --include=*.go . \| grep -v _test.go` |
 
 ## One-Command Startup

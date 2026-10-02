@@ -283,7 +283,7 @@ graph LR
 
 The hash on the public ledger still provides tamper evidence: anyone can verify that private data matching a given hash existed at a given block height, without seeing its contents.
 
-**Why the salt.** Names and birth dates have low entropy; an unsalted SHA-256 of them could be reversed by hashing candidate combinations. The API generates a random 32-byte salt per prescription (Node `crypto.randomBytes`) and sends it in the transient map. Chaincode rejects a missing or short salt but does **not** generate one — randomness inside chaincode would break determinism (NFR-7). The hash is computed over the canonical JSON of the private payload (fields in the fixed order of the [spec's PatientData table](../spec.md#patientdata-private-data-collection)).
+**Why the salt.** Names and birth dates have low entropy; an unsalted SHA-256 of them could be reversed by hashing candidate combinations. The API generates a random 32-byte salt per prescription (Node `crypto.randomBytes`) and sends it in the transient map. Chaincode rejects a missing or short salt but does **not** generate one — randomness inside chaincode would break determinism (NFR-7). The hash is computed over the canonical JSON of the private payload (fields in the fixed order of the [spec's PatientData table](../spec.md#patientdata-private-data-collection)). Readers recompute it from the decoded struct, **never from stored bytes**: CouchDB returns JSON documents re-serialized with keys in alphabetical order, so stored bytes never match what was written.
 
 ## Transaction Flows
 

@@ -14,9 +14,9 @@
 | 1 | Cryptographic Material and Organizations | M1 | ✅ Done | `501e3a1` |
 | 2 | Network Bring-Up | M1 | ✅ Done | `badf573` |
 | 3 | Identity Enrollment | M1 | ✅ Done | `64667cf` |
-| 4 | Chaincode Implementation | M2 — Contract working | ✅ Done | *(next commit)* |
-| 5 | Chaincode Deployment | M2 | ⏳ Next | — |
-| 6 | API Gateway | M3 — Application layer | — | — |
+| 4 | Chaincode Implementation | M2 — Contract working | ✅ Done | `460463c` |
+| 5 | Chaincode Deployment | M2 | ✅ Done | *(next commit)* |
+| 6 | API Gateway | M3 — Application layer | ⏳ Next | — |
 | 7 | Web UI | M3 | — | — |
 | 8 | Demo Scenarios and Documentation | M4 — Demo ready | — | — |
 
@@ -202,7 +202,7 @@ Update this table when a phase's exit gate passes.
 
 **Goal:** Chaincode committed on `prescription-channel` and proven end to end from the CLI.
 
-**Deliverables:** `network/collections_config.json`, `network/scripts/deployChaincode.sh`.
+**Deliverables:** `network/collections_config.json`, `network/scripts/deployChaincode.sh`, `network/scripts/smokeTest.sh`.
 
 **Steps:**
 1. Write `network/collections_config.json` per [Private Data](design/chaincode.md#private-data).
@@ -216,7 +216,7 @@ Update this table when a phase's exit gate passes.
      - `--collections-config ./collections_config.json`
    - `peer lifecycle chaincode checkcommitreadiness` — all five must show `true`
    - `peer lifecycle chaincode commit` with `--peerAddresses` for all endorsing peers
-3. Smoke test via CLI:
+3. Write `network/scripts/smokeTest.sh` running the exit-gate sequence below plus role, fraud-rule (R1 at a second pharmacy), and privacy checks with the demo identities. Core CLI calls:
    ```
    peer chaincode invoke ... -c '{"function":"IssuePrescription","Args":[...]}' \
      --transient '{"patientName":"<base64>","patientDOB":"<base64>","patientRef":"<base64>","salt":"<base64>"}'
@@ -230,6 +230,7 @@ Update this table when a phase's exit gate passes.
 - CLI invoke of `RecordFulfillment` as a pharmacist commits
 - Status now returns `FULLY_FULFILLED`
 - `GetPrescriptionHistory` on the prescription key returns exactly **one** entry, proving the prescription record was never modified
+- `down.sh` → `up.sh` → `createChannel.sh` → `enrollUsers.sh` → `deployChaincode.sh` → `smokeTest.sh` passes from scratch
 
 ---
 

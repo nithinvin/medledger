@@ -48,6 +48,10 @@ declare -A ORDERER_PORT=([orderer1]=7050 [orderer2]=8050 [orderer3]=9050)
 declare -A ORDERER_ADMIN_PORT=([orderer1]=7053 [orderer2]=8053 [orderer3]=9053)
 ORDERER_TLS_CA="$ORG_DIR/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem"
 ORDERER_ADMIN_TLS_DIR="$ORG_DIR/ordererOrganizations/example.com/users/Admin@example.com/tls"
+# Flags for peer CLI commands that submit to the ordering service.
+ORDERER_ARGS=(-o "localhost:${ORDERER_PORT[orderer1]}" --tls --cafile "$ORDERER_TLS_CA")
+
+CC_NAME="medledger"
 
 # Host-side Fabric CLIs: binaries from install-fabric.sh, core.yaml from its config/.
 export PATH="$PATH:$REPO_DIR/bin"
@@ -84,6 +88,11 @@ set_peer_env() {
   CORE_PEER_MSPCONFIGPATH="$(user_msp_dir "$org" "$user")"
   export CORE_PEER_MSPCONFIGPATH
   export CORE_PEER_ADDRESS="localhost:${PEER_PORT[$org]}"
+}
+
+# TLS root CA of an org's peers, for --tlsRootCertFiles.
+peer_tls_ca() {
+  echo "$ORG_DIR/peerOrganizations/${1}.example.com/tlsca/tlsca.${1}.example.com-cert.pem"
 }
 
 # Poll a command until it succeeds or the timeout (seconds) expires.

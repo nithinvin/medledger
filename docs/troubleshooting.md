@@ -9,9 +9,10 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 | Symptom | Cause | Fix |
 |---|---|---|
 | Chaincode build fails with a Go toolchain/version error | `go.mod` `go` directive is newer than `fabric-ccenv`'s Go | Keep the pins in [architecture.md](design/architecture.md#technology-stack-and-versions); never `go get …@latest` for the contract API |
+| `golangci-lint` fails with `could not load export data ... unsupported version: 2` | Linter older than the Go toolchain (e.g. openSUSE's 1.60.3 package) | Install v2.14.0 per the [runbook](runbook.md#install), or use its Docker command |
 | Scripts fail with `$'\r': command not found` on WSL | CRLF line endings from a Windows-side checkout | Clone inside the WSL filesystem; `.gitattributes` forces LF on `*.sh` |
 | Bind mounts or Docker socket denied on openSUSE | SELinux enforcing | Every compose service already sets `label=disable`; check it was not removed |
-| Chaincode build fails with `lookup proxy.golang.org: i/o timeout` | The build container has no DNS (seen on Docker's default bridge on this host) | Vendor modules before packaging (`go mod vendor`); `deployChaincode.sh` does this ([D16](decisions.md)) |
+| Chaincode build fails with `lookup proxy.golang.org: i/o timeout` | Containers cannot resolve internet names — e.g. `/etc/docker/daemon.json` lists DNS servers unreachable from the current network (work/VPN resolvers) | Vendor modules before packaging (`go mod vendor`); `deployChaincode.sh` does this ([D16](decisions.md)) |
 
 ## Crypto Material and Channel
 
@@ -38,6 +39,8 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 | Empty private data on read | Transient map keys mismatched, or values not base64-encoded | Match the keys in [Function Behaviour](design/chaincode.md#function-behaviour); base64-encode values |
 | `MVCC_READ_CONFLICT` | Two transactions writing the same key in one block | Expected under concurrent load; retry |
 | Old chaincode behaviour after redeploying | Stale `dev-peer*` containers | `down.sh` prunes them |
+| Hash or byte comparison of stored JSON fails on the network but passes in unit tests | CouchDB returns JSON re-serialized with sorted keys | Decode, then re-encode via the Go struct before hashing or comparing; the test mock now re-serializes JSON the same way |
+| `deployChaincode.sh` says the sequence is already committed, but the code changed | Same `CC_SEQUENCE` as the committed definition | Bump `CC_VERSION` and `CC_SEQUENCE` ([runbook](runbook.md#network-scripts)) |
 
 ## Expected Log Noise
 

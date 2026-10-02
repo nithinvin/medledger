@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "name": "patientDataCollection",
+    "policy": "OR('HospitalAMSP.member', 'HospitalBMSP.member', 'PharmacyXMSP.member', 'PharmacyYMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 3,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true
+  }
+]

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,8 +33,12 @@ func TestIssuePrescriptionSuccess(t *testing.T) { // AC-1
 
 	private := l.Private(contracts.CollectionPatientData, id(1))
 	require.NotNil(t, private, "patient data in the private collection")
-	sum := sha256.Sum256(private)
-	assert.Equal(t, hex.EncodeToString(sum[:]), p.PatientDataHash, "public hash is SHA-256 of the private payload")
+	var stored models.PatientData
+	require.NoError(t, json.Unmarshal(private, &stored))
+	canonical, err := json.Marshal(stored) // struct field order, independent of storage
+	require.NoError(t, err)
+	sum := sha256.Sum256(canonical)
+	assert.Equal(t, hex.EncodeToString(sum[:]), p.PatientDataHash, "public hash is SHA-256 of the canonical private payload")
 
 	// Visible from a pharmacy (AC-1: queryable from a pharmacy peer).
 	got, err := query(l, pharmJones, t0, func(ctx *mock.Context) (*models.Prescription, error) {

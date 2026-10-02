@@ -20,12 +20,14 @@ The constitution below is binding for all code, architecture, refactoring, and a
 | Lint shell scripts | `shellcheck network/scripts/*.sh` |
 | Check doc links | `node scripts/check-doc-links.mjs` |
 | Chaincode tests / lint | `cd chaincode/medledger && go test ./...` — full gate list in `docs/runbook.md#chaincode-development` |
-| Network lifecycle | `network/scripts/{generateArtifacts,up,createChannel,down}.sh` |
+| Network lifecycle | `network/scripts/{generateArtifacts,up,createChannel,enrollUsers,deployChaincode,down}.sh` |
+| End-to-end check | `network/scripts/smokeTest.sh` |
 | Point `peer` CLI at an org | `source network/scripts/common.sh && set_peer_env <org>` |
 
 ## Gotchas
 
 - Never regenerate crypto material while the network runs — `generateArtifacts.sh` refuses; run `down.sh` first.
 - Contract API is pinned to v2.2.1 / `go 1.24.0`. Never `go get …@latest`: v2.2.3 needs a Go newer than `fabric-ccenv:2.5.16` ships.
+- Never hash or byte-compare JSON read back from the ledger: CouchDB re-serializes it with sorted keys. Decode into the struct and re-encode. `internal/mock` models this.
 - Chaincode must be deterministic: no `time.Now`, `math/rand`, `os.Getenv`, `os.ReadFile`; time comes from `GetTxTimestamp()`, reference data from `go:embed`.
 - Fabric terms (MSP, NodeOUs, SAN, …) are explained in `docs/glossary.md`.

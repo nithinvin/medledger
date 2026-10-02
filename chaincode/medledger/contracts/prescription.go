@@ -72,6 +72,10 @@ func (c *PrescriptionContract) IssuePrescription(ctx contractapi.TransactionCont
 	if err != nil {
 		return nil, errs.Internal("encode patient data", err)
 	}
+	patientHash, err := patientDataHash(patient)
+	if err != nil {
+		return nil, err
+	}
 	now, err := utils.TxTime(ctx)
 	if err != nil {
 		return nil, err
@@ -79,7 +83,7 @@ func (c *PrescriptionContract) IssuePrescription(ctx contractapi.TransactionCont
 
 	p := models.Prescription{
 		PrescriptionID:     prescriptionID,
-		PatientDataHash:    sha256Hex(patientJSON),
+		PatientDataHash:    patientHash,
 		DoctorID:           caller.ID,
 		DoctorMSP:          caller.MSP,
 		DrugCode:           drug.DrugCode,
@@ -176,12 +180,16 @@ func (c *PrescriptionContract) ReadPatientData(ctx contractapi.TransactionContex
 	if data == nil {
 		return nil, errs.New(errs.CodeNotFound, "no patient data for prescription %s on this peer", prescriptionID)
 	}
-	if sha256Hex(data) != p.PatientDataHash {
-		return nil, errs.New(errs.CodeInternal, "patient data for %s does not match its public hash", prescriptionID)
-	}
 	var patient models.PatientData
 	if err := json.Unmarshal(data, &patient); err != nil {
 		return nil, errs.Internal("decode patient data", err)
+	}
+	hash, err := patientDataHash(patient)
+	if err != nil {
+		return nil, err
+	}
+	if hash != p.PatientDataHash {
+		return nil, errs.New(errs.CodeInternal, "patient data for %s does not match its public hash", prescriptionID)
 	}
 	return &patient, nil
 }
@@ -255,7 +263,14 @@ func writePrescription(ctx contractapi.TransactionContextInterface, p models.Pre
 	return nil
 }
 
-func sha256Hex(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
+// patientDataHash is SHA-256 over the canonical encoding of the payload: the
+// models.PatientData struct marshalled in its fixed field order. Never hash
+// stored bytes directly — CouchDB returns JSON re-serialized with sorted keys.
+func patientDataHash(patient models.PatientData) (string, error) {
+	canonical, err := json.Marshal(patient)
+	if err != nil {
+		return "", errs.Internal("encode patient data", err)
+	}
+	sum := sha256.Sum256(canonical)
+	return hex.EncodeToString(sum[:]), nil
 }
