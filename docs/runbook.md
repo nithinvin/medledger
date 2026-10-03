@@ -54,7 +54,7 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 sudo usermod -aG docker "$USER"
 ```
 
-Then close and reopen the Ubuntu terminal so the `docker` group applies.
+Then run `wsl --shutdown` in PowerShell and reopen Ubuntu so the `docker` group applies. Closing and reopening the terminal is not enough.
 
 **Ubuntu / WSL — option B: Docker Desktop.** Install Docker Desktop on Windows; in *Settings → Resources → WSL integration*, enable **Ubuntu-24.04**. Do not also install Docker Engine inside WSL.
 
