@@ -55,3 +55,6 @@ dist/
 
 # --- Logs ---
 *.log
+
+# --- Demo run-time state (PIDs, logs, seeded IDs) ---
+demo/.run/

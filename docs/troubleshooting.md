@@ -58,6 +58,8 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 | Banner: `NETWORK: cannot reach the MedLedger API` | API not running on port 3000 | `cd api && npm start` |
 | `npm run dev` fails: `Port 5173 is already in use` | Another dev server is running (`strictPort` is on) | Stop the other process, e.g. `pkill -f vite` |
 | Signed out after restarting the API | Random per-process JWT secret | Set `MEDLEDGER_JWT_SECRET`, or sign in again |
+| `run-demo.sh` stops with `port 3000 is in use` (or 5173) | An API or Vite started by hand is still running | `./run-demo.sh stop`, or stop the process listening on that port |
+| `fraud-scenarios.sh` reports scenario 8 *skipped* | The seeded 1-day prescription has not expired yet | Expected; rerun more than a day after `seed.sh`. R3 is proven by the chaincode unit tests ([runbook](runbook.md#demo-scenarios)) |
 
 ## Shell Scripts
 

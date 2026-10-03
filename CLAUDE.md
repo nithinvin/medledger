@@ -17,11 +17,12 @@ The constitution below is binding for all code, architecture, refactoring, and a
 
 | Task | Command |
 |---|---|
-| Lint shell scripts | `shellcheck network/scripts/*.sh` |
 | Check doc links | `node scripts/check-doc-links.mjs` |
 | Chaincode tests / lint | `cd chaincode/medledger && go test ./...` — full gate list in `docs/runbook.md#chaincode-development` |
 | Network lifecycle | `network/scripts/{generateArtifacts,up,createChannel,enrollUsers,deployChaincode,down}.sh` |
 | End-to-end check | `network/scripts/smokeTest.sh` |
+| Full demo | `./run-demo.sh` (start, ~2–3 min) · `./run-demo.sh stop` · `demo/fraud-scenarios.sh` |
+| Lint all scripts | `shellcheck run-demo.sh demo/*.sh network/scripts/*.sh` |
 | API tests / lint | `cd api && npm test && npm run lint && npm run format:check`; live: `npm run test:live` |
 | Web UI tests / lint | `cd web && npm test && npm run lint && npm run format:check && npm run build` |
 | Point `peer` CLI at an org | `source network/scripts/common.sh && set_peer_env <org>` |

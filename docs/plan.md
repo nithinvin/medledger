@@ -17,8 +17,8 @@
 | 4 | Chaincode Implementation | M2 — Contract working | ✅ Done | `460463c` |
 | 5 | Chaincode Deployment | M2 | ✅ Done | `ea59fd2` |
 | 6 | API Gateway | M3 — Application layer | ✅ Done | `a226e45` |
-| 7 | Web UI | M3 | ✅ Done | *(next commit)* |
-| 8 | Demo Scenarios and Documentation | M4 — Demo ready | ⏳ Next | — |
+| 7 | Web UI | M3 | ✅ Done | `866a9be` |
+| 8 | Demo Scenarios and Documentation | M4 — Demo ready | ✅ Done | *(next commit)* |
 
 Update this table when a phase's exit gate passes.
 
@@ -278,17 +278,17 @@ Update this table when a phase's exit gate passes.
 
 **Goal:** A one-command demo and scripted fraud scenarios.
 
-**Deliverables:** `demo/seed.sh`, `demo/fraud-scenarios.sh`, `run-demo.sh`, `README.md`.
+**Deliverables:** `demo/lib.sh`, `demo/seed.sh`, `demo/fraud-scenarios.sh`, `run-demo.sh`, `README.md`.
 
 **Steps:**
-1. Write `demo/seed.sh` creating a baseline dataset: several prescriptions across both hospitals, mixed control classes, some already fulfilled.
+1. Write `demo/seed.sh` creating a baseline dataset through the API: prescriptions from both hospitals, every control class and status, plus a 1-day prescription for a live R3 check later.
 2. Write `demo/fraud-scenarios.sh` executing each [demo scenario](runbook.md#demo-scenarios) and printing the outcome, formatted for live presentation.
 3. Write `run-demo.sh` per [One-Command Startup](runbook.md#one-command-startup).
 4. Update the root `README.md` quick start; mark the runbook's "Available after" notes as done.
 
 **Exit gate:**
-- All eleven scenarios produce their expected outcomes
-- `run-demo.sh` takes a fresh checkout to a working demo (NFR-6, AC-11)
+- All twelve scenarios produce their expected outcomes; scenario 8 (R3) runs live once the seeded 1-day prescription has expired, and is otherwise skipped with R3 covered by the chaincode unit tests
+- `run-demo.sh` takes a fresh checkout to a working demo (NFR-6, AC-11), and `run-demo.sh stop` stops everything
 - `README.md` plus the runbook let a fresh machine reach a working demo
 
 ---

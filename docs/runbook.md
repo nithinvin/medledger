@@ -142,44 +142,19 @@ The dev server binds to `127.0.0.1:5173` and proxies `/api` to the API on port 3
 
 ## One-Command Startup
 
-*Available after Phase 8.* `run-demo.sh` at the repository root runs the whole sequence:
+From the repository root, after [Install](#install):
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-echo "[1/7] Tearing down any previous network..."
-(cd network && ./scripts/down.sh) || true
-
-echo "[2/7] Generating crypto material and channel artifacts..."
-(cd network && ./scripts/generateArtifacts.sh)
-
-echo "[3/7] Starting Fabric network..."
-(cd network && ./scripts/up.sh)
-
-echo "[4/7] Creating channel and joining orderers and peers..."
-(cd network && ./scripts/createChannel.sh)
-
-echo "[5/7] Enrolling doctor, pharmacist, and regulator identities..."
-(cd network && ./scripts/enrollUsers.sh)
-
-echo "[6/7] Packaging and deploying chaincode..."
-(cd network && ./scripts/deployChaincode.sh)
-
-echo "[7/7] Starting API gateway and web UI..."
-(cd api && npm ci && npm start &)
-(cd web && npm ci && npm run dev &)
-
-sleep 10
-echo "Seeding demo data..."
-./demo/seed.sh
-
-echo ""
-echo "Demo ready:"
-echo "  Web UI:  http://localhost:5173"
-echo "  API:     http://localhost:3000"
-echo "  CouchDB: http://localhost:5984/_utils"
+./run-demo.sh          # fresh network → users → chaincode → API + web UI → seed data (~2–3 min)
+./run-demo.sh stop     # stop the API and web UI, and tear the network down
 ```
+
+`run-demo.sh` always starts from scratch: it runs `down.sh`, `generateArtifacts.sh`, `up.sh`, `createChannel.sh`, `enrollUsers.sh`, and `deployChaincode.sh`, then starts the API and web UI in the background (running `npm ci` first if `node_modules/` is missing) with a fresh JWT secret, and finally `demo/seed.sh`. It prints the URLs and the seeded prescription IDs. Logs and PIDs go to `demo/.run/` (git-ignored).
+
+| Script | What it does |
+|---|---|
+| `demo/seed.sh` | Six prescriptions through the API, covering both hospitals, every control class, and every status; one is valid for only 1 day, for the R3 scenario. Safe to rerun |
+| `demo/fraud-scenarios.sh [--pause]` | The [demo scenarios](#demo-scenarios), each on fresh prescriptions, with ✓/✗ per scenario; `--pause` waits for Enter between them. Repeatable |
 
 ## Demo Accounts
 
@@ -195,23 +170,28 @@ Enrolled by `enrollUsers.sh`. Each user's MSP (certificate + private key) is at 
 
 ## Demo Scenarios
 
-*Available after Phase 8.* `demo/fraud-scenarios.sh` runs each attempt and prints the outcome:
+`demo/fraud-scenarios.sh` runs these through the API; every rejection comes from the chaincode:
 
 | Scenario | Action | Expected |
 |---|---|---|
-| 1 | Pharmacist attempts issuance | Rejected: unauthorized role |
-| 2 | Doctor attempts fulfillment | Rejected: unauthorized role |
+| 1 | Pharmacist attempts issuance | Rejected: `UNAUTHORIZED` |
+| 2 | Doctor attempts fulfillment | Rejected: `UNAUTHORIZED` |
 | 3 | Second dispense at same pharmacy, zero refills | Rejected: R1 |
 | 4 | **Dispense at PharmacyY after PharmacyX already dispensed, zero refills** | Rejected: R1 |
-| 5 | Dispense at PharmacyY inside the refill interval of a PharmacyX fill, refills remaining (e.g. `SCHEDULE_H1`) | Rejected: R7 |
-| 6 | `NDPS` drug (morphine) issued with refills | Rejected: R6 |
-| 7 | Dispense after validity window | Rejected: R3 |
-| 8 | Dispense more than prescribed quantity | Rejected: R2 |
-| 9 | Dispense after revocation | Rejected: R5 |
-| 10 | Prescription history after fulfillment | Exactly one entry — never mutated |
-| 11 | Regulator reads patient name | Unavailable — private collection excludes regulator |
+| 5 | Dispense at PharmacyY inside the 20-day interval of a PharmacyX fill (`SCHEDULE_H1`, refills remaining) | Rejected: R7 |
+| 6 | Refill at the same pharmacy inside that interval | Rejected: R4 |
+| 7 | `NDPS` drug (morphine) issued with refills | Rejected: R6 |
+| 8 | Dispense after the validity window | Rejected: R3 — *live only once the seeded 1-day prescription has expired* |
+| 9 | Dispense more than prescribed quantity | Rejected: R2 |
+| 10 | Dispense after revocation | Rejected: R5 |
+| 11 | Prescription history after fulfillment | Exactly one write — never mutated |
+| 12 | Regulator reads patient data | Rejected: `UNAUTHORIZED` — private collection excludes regulator |
+
+**About scenario 8.** Transaction time comes from the real clock, so expiry cannot be fast-forwarded on a live ledger. `seed.sh` issues a 1-day prescription; when `fraud-scenarios.sh` runs more than a day later, scenario 8 runs live. Until then it is reported as *skipped*, and R3 remains proven by the chaincode unit tests (AC-8).
 
 ## Live Demo Sequence (8–10 minutes)
+
+Start with `./run-demo.sh` (before the audience arrives — it takes ~2–3 minutes), then use the web UI:
 
 1. **Show the network** — `docker ps`, point out five independent peers each with its own ledger and CouchDB.
 2. **Issue a prescription** as `dr.smith` for an `NDPS` drug (morphine), zero refills.
@@ -221,11 +201,12 @@ Enrolled by `enrollUsers.sh`. Each user's MSP (certificate + private key) is at 
 6. **Show immutability** — run the history query on the prescription. Exactly one entry. The status changed without the record ever being touched.
 7. **Show role separation** — log in as `dr.smith`, attempt a dispense. Rejected by chaincode, not by the UI.
 8. **Show privacy** — log in as `auditor.gov`, open the same prescription. Full audit trail visible; patient name is not, and the salted hash cannot be reversed.
+9. **Wrap up** — run `demo/fraud-scenarios.sh --pause` in a terminal to walk through every fraud rule.
 
 ## Teardown
 
 ```bash
-network/scripts/down.sh
+./run-demo.sh stop      # or, network only: network/scripts/down.sh
 ```
 
 This removes the containers, their volumes, and the `dev-peer*` chaincode containers and images. Chaincode containers survive a plain `docker compose down` and would serve stale chaincode on the next run, which is why `down.sh` prunes them. Crypto material and the channel block are kept; `generateArtifacts.sh` regenerates them.

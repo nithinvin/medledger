@@ -31,7 +31,7 @@ medledger/
 ├── README.md
 ├── CLAUDE.md                    # Claude Code instructions (imports CONSTITUTION.md)
 ├── CONSTITUTION.md
-├── run-demo.sh
+├── run-demo.sh                  # one-command demo: start / stop
 ├── .shellcheckrc
 ├── .claude/settings.json        # shared Claude Code permission allowlist
 ├── scripts/
@@ -129,6 +129,8 @@ medledger/
 │   │       └── RegulatorView.jsx
 │   └── test/
 └── demo/
+    ├── lib.sh                   # API helpers for the demo scripts
     ├── seed.sh
-    └── fraud-scenarios.sh
+    ├── fraud-scenarios.sh
+    └── .run/                    # run-time logs, PIDs, seeded IDs (git-ignored)
 ```
