@@ -47,7 +47,11 @@ for orderer in "${ORDERERS[@]}"; do
 done
 log "All orderers active on $CHANNEL_NAME"
 
-peer_joined() { peer channel list 2>/dev/null | grep -qx "$CHANNEL_NAME"; }
+# Capture before grep -q: under pipefail an early grep exit can SIGPIPE the writer.
+peer_joined() {
+  local channels
+  channels="$(peer channel list 2>/dev/null)" && grep -qx "$CHANNEL_NAME" <<<"$channels"
+}
 
 for org in "${PEER_ORGS[@]}"; do
   set_peer_env "$org"

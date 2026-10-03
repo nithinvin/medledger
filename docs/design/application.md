@@ -35,11 +35,12 @@ The API serves plain HTTP on `localhost:3000` and the web UI on `localhost:5173`
 - Demo passwords are `<username>pw`, compared in constant time ([spec X9](../spec.md#out-of-scope)).
 - The signing secret comes from `MEDLEDGER_JWT_SECRET`; if unset, a random per-process secret is used and tokens stop working when the API restarts. No secret is stored in the source.
 - Identity for chaincode calls always comes from the JWT, never from request parameters (e.g. `/api/doctors/me/prescriptions` uses the token's MSP and username).
-- Missing, tampered, or expired tokens → `401 UNAUTHENTICATED`. Role checks here are UX only; the chaincode enforces them ([D7](../decisions.md)).
+- Missing, tampered, or expired tokens → `401 UNAUTHENTICATED`.
+- The API performs **no role checks**: every authenticated request is forwarded as that user, and the chaincode — the single enforcement point — rejects what the role may not do ([D7](../decisions.md), [D19](../decisions.md)). A cross-role attempt therefore returns the chaincode's own `UNAUTHORIZED` message, which is what the demo shows.
 
 ### API Routes
 
-| Method | Path | Role | Chaincode function |
+| Method | Path | Role (enforced by chaincode) | Chaincode function |
 |---|---|---|---|
 | POST | `/api/auth/login` | — | — |
 | GET | `/api/drugs` | any | `GetDrugReference` |
@@ -87,8 +88,13 @@ Patient fields must be sent as **transient data**, base64-encoded, never as regu
 
 ## Web UI
 
+React 19 + Vite + Tailwind, plain JSX. `App.jsx` holds the session (token + user, kept in `sessionStorage`) and renders the view for the user's role. Views get the API client from `ApiContext`, so tests inject a fake. All requests go to `/api`, proxied by Vite to the gateway.
+
 - **Login screen** with the five demo accounts selectable ([runbook](../runbook.md#demo-accounts)).
-- **Doctor view:** issue prescription form (patient fields, drug picked from `/api/drugs` showing its control class, quantity, refills, validity); list of own prescriptions with derived status badges; revoke action.
-- **Pharmacist view:** prescription lookup by ID; eligibility check panel showing pass/fail per rule R1–R7; dispense form enabled only when eligible; fulfillment history.
-- **Regulator view:** prescription lookup; full transaction history table with transaction IDs, timestamps, and endorsing orgs; patient fields shown as hash only, demonstrating private-data exclusion.
+- **Doctor view:** issue prescription form (patient fields, drug picked from `/api/drugs` showing its control class and refill limit); list of own prescriptions with derived status badges; revoke with a reason.
+- **Pharmacist view:** prescription lookup by ID, with the private patient fields; eligibility check with a rule checklist; dispense enabled only after a passing check **for that exact quantity**; fulfillment history.
+- **Regulator view:** prescription lookup; transaction history with transaction IDs, timestamps, validation codes, and endorsing orgs; patient fields shown as hash only, plus a "try to read patient data" action that the chaincode refuses.
+- **Rule checklist:** the eligibility result names only the *first* failing rule, so rules are shown in evaluation order (R5, R3, R1, R2, R4, R7) as passed / failed / not evaluated; R6 is marked "checked at issuance".
+- **Cross-role demo panels:** the doctor view can attempt a dispense and the pharmacist view an issuance. The rejection shown is the chaincode's, labelled "Rejected by the chaincode" ([D19](../decisions.md)).
+- **Errors:** every rejection is shown with its rule ID and name (e.g. `R1 — Fill limit reached: …`) or error code.
 - **Status badge colors:** `ISSUED` neutral, `PARTIALLY_FULFILLED` amber, `FULLY_FULFILLED` green, `EXPIRED` grey, `REVOKED` red.

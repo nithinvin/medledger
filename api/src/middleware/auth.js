@@ -61,13 +61,3 @@ export function requireAuth(secret) {
     next();
   };
 }
-
-// UX-level role check; the chaincode is the enforcement point (D7).
-export function requireRole(...roles) {
-  return (req, _res, next) => {
-    if (!roles.includes(req.user?.role)) {
-      throw new ApiError(403, 'UNAUTHORIZED', `role ${req.user?.role} may not call this endpoint`);
-    }
-    next();
-  };
-}

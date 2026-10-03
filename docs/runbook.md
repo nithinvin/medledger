@@ -64,7 +64,7 @@ Every port binds to `127.0.0.1` only. Credentials are fixed demo values ([spec X
 | Fabric CAs | `ca.<org>.example.com` | 7054 / 8054 / 9054 / 10054 / 11054 (same org order) | `admin` / `adminpw`; demo users enroll with `<username>pw` |
 | CouchDB | `couchdb-a`, `-b`, `-x`, `-y`, `-r` | 5984 / 6984 / 7984 / 8984 / 9984 — UI at `/_utils` | `admin` / `adminpw` |
 | API gateway | `node src/server.js` (host process) | 3000 | Demo logins: `<username>` / `<username>pw` |
-| Web UI | — | 5173 | Demo logins |
+| Web UI | `npx vite` dev server (host process) | 5173 — `/api` proxied to 3000 | Demo logins (one click per account) |
 
 ## Network Scripts
 
@@ -125,6 +125,20 @@ TOKEN=$(curl -s localhost:3000/api/auth/login -H 'Content-Type: application/json
   -d '{"username":"dr.smith","password":"dr.smithpw"}' | jq -r .token)
 curl -s localhost:3000/api/drugs -H "Authorization: Bearer $TOKEN" | jq '.drugs[].drugCode'
 ```
+
+## Web UI
+
+Needs the API running. From `web/`:
+
+| Task | Command |
+|---|---|
+| Install dependencies | `npm ci` |
+| Start | `npm run dev` — open `http://localhost:5173` |
+| Tests | `npm test` |
+| Lint / format check | `npm run lint`, `npm run format:check` |
+| Production build check | `npm run build` |
+
+The dev server binds to `127.0.0.1:5173` and proxies `/api` to the API on port 3000.
 
 ## One-Command Startup
 

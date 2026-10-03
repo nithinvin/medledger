@@ -23,6 +23,7 @@ The constitution below is binding for all code, architecture, refactoring, and a
 | Network lifecycle | `network/scripts/{generateArtifacts,up,createChannel,enrollUsers,deployChaincode,down}.sh` |
 | End-to-end check | `network/scripts/smokeTest.sh` |
 | API tests / lint | `cd api && npm test && npm run lint && npm run format:check`; live: `npm run test:live` |
+| Web UI tests / lint | `cd web && npm test && npm run lint && npm run format:check && npm run build` |
 | Point `peer` CLI at an org | `source network/scripts/common.sh && set_peer_env <org>` |
 
 ## Gotchas
@@ -30,5 +31,7 @@ The constitution below is binding for all code, architecture, refactoring, and a
 - Never regenerate crypto material while the network runs — `generateArtifacts.sh` refuses; run `down.sh` first.
 - Contract API is pinned to v2.2.1 / `go 1.24.0`. Never `go get …@latest`: v2.2.3 needs a Go newer than `fabric-ccenv:2.5.16` ships.
 - Never hash or byte-compare JSON read back from the ledger: CouchDB re-serializes it with sorted keys. Decode into the struct and re-encode. `internal/mock` models this.
+- Shell: never `cmd | grep -q` under `pipefail` — capture into a variable first (SIGPIPE makes the pipeline fail).
+- The API does no role checks (D19); authorization lives only in the chaincode.
 - Chaincode must be deterministic: no `time.Now`, `math/rand`, `os.Getenv`, `os.ReadFile`; time comes from `GetTxTimestamp()`, reference data from `go:embed`.
 - Fabric terms (MSP, NodeOUs, SAN, …) are explained in `docs/glossary.md`.

@@ -22,5 +22,6 @@ Architectural decisions and the alternatives rejected. Append new decisions with
 | D16 | Vendor Go modules before packaging chaincode | Let the peer's build container download modules | Containers may have no working DNS (e.g. Docker configured with unreachable resolvers); vendoring makes the build offline and reproducible |
 | D17 | The API generates prescription IDs (UUID) and salts | Client-supplied IDs and salts | Clients cannot pick colliding IDs or weak salts; the chaincode still validates both |
 | D18 | Live API test starts the real `server.js` as a child process | Import the Fabric gateway into Jest | Tests the real entry point; Jest on Node 22 cannot load the gateway's ESM-only dependencies |
+| D19 | The API forwards every authenticated call; only the chaincode checks roles | API-level role checks duplicating the chaincode's | One enforcement point instead of two; cross-role attempts in the UI show the chaincode's real rejection, which is what the demo claims |
 
 > **On D6:** CouchDB rich queries (`GetQueryResult`) are evaluated during simulation but **not** re-evaluated at validation time, so results can be stale by commit time. They are safe for read-only query functions, and unsafe inside functions that write state based on their results. Core fraud checks therefore use deterministic composite-key range queries.

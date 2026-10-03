@@ -90,10 +90,13 @@ verify_user() {
   cert="$(user_msp_dir "$org" "$user")/signcerts/cert.pem"
   org_msp="$ORG_DIR/peerOrganizations/${org}.example.com/msp"
 
-  openssl x509 -in "$cert" -noout -text | grep -q "\"role\":\"${role}\"" \
+  # Capture before grep -q: under pipefail an early grep exit can SIGPIPE openssl.
+  local text subject
+  text="$(openssl x509 -in "$cert" -noout -text)" || die "$user: cannot read $cert"
+  subject="$(openssl x509 -in "$cert" -noout -subject)" || die "$user: cannot read $cert"
+  grep -q "\"role\":\"${role}\"" <<<"$text" \
     || die "$user: role=${role} attribute missing from certificate (registered without :ecert?)"
-  openssl x509 -in "$cert" -noout -subject | grep -q "OU *= *client" \
-    || die "$user: certificate is not OU=client"
+  grep -q "OU *= *client" <<<"$subject" || die "$user: certificate is not OU=client"
   openssl verify -CAfile "$org_msp"/cacerts/*.pem "$cert" >/dev/null \
     || die "$user: certificate does not chain to the ${ORG_MSP[$org]} root"
   ( set_peer_env "$org" "$user" && quiet peer channel getinfo -c "$CHANNEL_NAME" ) \

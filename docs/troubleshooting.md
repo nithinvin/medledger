@@ -51,6 +51,20 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 | `server.js` exits at start: `expected one private key …` or file not found | Demo users not enrolled | `network/scripts/enrollUsers.sh` |
 | Logins stop working after restarting the API | Random per-process JWT secret | Set `MEDLEDGER_JWT_SECRET` |
 
+## Web UI
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Banner: `NETWORK: cannot reach the MedLedger API` | API not running on port 3000 | `cd api && npm start` |
+| `npm run dev` fails: `Port 5173 is already in use` | Another dev server is running (`strictPort` is on) | Stop the other process, e.g. `pkill -f vite` |
+| Signed out after restarting the API | Random per-process JWT secret | Set `MEDLEDGER_JWT_SECRET`, or sign in again |
+
+## Shell Scripts
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A `cmd \| grep -q` check fails intermittently, more often as output grows | Under `set -o pipefail`, `grep -q` exits on the first match and the writer dies of SIGPIPE, failing the pipeline | Capture first, then search: `out="$(cmd)" && grep -q pattern <<<"$out"` |
+
 ## Expected Log Noise
 
 These look like errors but are normal:
@@ -60,4 +74,5 @@ These look like errors but are normal:
 | `gossip.comm ... Authentication failed: failed classifying identity` | During `createChannel.sh`, for a second or two | A peer gossips with peers not yet on the channel, whose MSPs it cannot classify yet. Persistent occurrences after all peers joined mean an MSP problem. |
 | CouchDB messages about missing `_users` database | CouchDB start-up | Single-node CouchDB without system databases; Fabric does not need them |
 | `WARN [msp] loadCertificateAt -> Failed loading ...OU certificate` | Host CLI using a user MSP whose `cacerts/` filename differs from `config.yaml` | Peers classify identities with the channel MSP, so requests still succeed. `enrollUsers.sh` renames the file to avoid the warning. |
+| `core.comm ... Server TLS handshake failed ... remote error: tls: bad certificate` between peers | A few seconds after the containers restart (e.g. after a reboot) | A peer has not loaded the channel's TLS roots for the other orgs yet and briefly rejects their certificates. Persistent occurrences mean a TLS/MSP problem. |
 | `enrollUsers.sh` registers every user again | After `down.sh` | `down.sh` deletes the CA databases with the volumes; re-registration is expected |

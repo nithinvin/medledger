@@ -118,11 +118,20 @@ fi
 pass "regulator cannot read patient data"
 
 db="${CHANNEL_NAME}_${CC_NAME}"
-if curl -sf -u admin:adminpw "http://127.0.0.1:${COUCHDB_PORT[regulator]}/${db}/_all_docs?include_docs=true" | grep -q "$PATIENT_NAME"; then
+regulator_docs() { curl -sf -u admin:adminpw "http://127.0.0.1:${COUCHDB_PORT[regulator]}/${db}/_all_docs?include_docs=true"; }
+# Capture before searching: under pipefail, `curl | grep -q` fails whenever
+# grep exits on its first match before curl finishes writing (SIGPIPE).
+regulator_has_rx() {
+  local docs
+  docs="$(regulator_docs)" && grep -q "$RX_ID" <<<"$docs"
+}
+# --waitForEvent only waits for the submitting peer; the regulator's peer may
+# commit the block a moment later (seconds after a cold restart).
+wait_for "the regulator's peer to commit $RX_ID" 30 regulator_has_rx
+docs="$(regulator_docs)" || fail "could not read the regulator's state database"
+if grep -q "$PATIENT_NAME" <<<"$docs"; then
   fail "patient name found in the regulator's public state database"
 fi
-curl -sf -u admin:adminpw "http://127.0.0.1:${COUCHDB_PORT[regulator]}/${db}/_all_docs?include_docs=true" | grep -q "$RX_ID" \
-  || fail "prescription not found in the regulator's state database (check is not meaningful)"
 pass "patient name absent from the regulator's world state, though the prescription is there"
 
 log "OK: smoke test passed ($passed checks)."

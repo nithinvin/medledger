@@ -98,21 +98,21 @@ describe('auth', () => {
   });
 });
 
-describe('role checks (UX layer; chaincode enforces too)', () => {
+describe('role enforcement is left to the chaincode (D7, D19)', () => {
   test.each([
-    ['pharm.jones', 'post', '/api/prescriptions'],
-    ['auditor.gov', 'post', '/api/prescriptions'],
-    ['dr.smith', 'post', `/api/prescriptions/${RX}/fulfillments`],
-    ['auditor.gov', 'get', `/api/prescriptions/${RX}/patient`],
-    ['dr.smith', 'get', `/api/prescriptions/${RX}/eligibility?quantity=1`],
-    ['pharm.jones', 'post', `/api/prescriptions/${RX}/revoke`],
-    ['pharm.jones', 'get', '/api/doctors/me/prescriptions'],
-    ['dr.smith', 'get', `/api/audit/${RX}/history`],
-  ])('%s %s %s → 403 without calling Fabric', async (user, method, path) => {
-    const res = await request(app)[method](path).set(as(user)).send({});
+    ['pharm.jones', 'post', '/api/prescriptions', validIssue],
+    ['dr.smith', 'post', `/api/prescriptions/${RX}/fulfillments`, { quantityDispensed: 1 }],
+    ['auditor.gov', 'get', `/api/prescriptions/${RX}/patient`, undefined],
+    ['dr.smith', 'get', `/api/audit/${RX}/history`, undefined],
+  ])('%s %s %s is forwarded; the chaincode rejection becomes 403', async (user, method, path, body) => {
+    fabric.error = Object.assign(new Error('10 ABORTED: failed to endorse transaction'), {
+      details: [{ message: 'chaincode response 500, UNAUTHORIZED: role may not call this function' }],
+    });
+    const res = await request(app)[method](path).set(as(user)).send(body);
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('UNAUTHORIZED');
-    expect(fabric.calls).toHaveLength(0);
+    expect(fabric.calls).toHaveLength(1);
+    expect(fabric.calls[0].user).toBe(user);
   });
 });
 

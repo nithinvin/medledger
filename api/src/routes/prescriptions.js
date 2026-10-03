@@ -1,21 +1,18 @@
-// Prescription routes (docs/design/application.md#api-routes).
+// Prescription routes (docs/design/application.md#api-routes). Role checks are
+// left to the chaincode, the single enforcement point (decisions D7, D19).
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { CONTRACTS, ROLES } from '../config.js';
-import { requireRole } from '../middleware/auth.js';
+import { CONTRACTS } from '../config.js';
 import { requireDate, requireInteger, requireText, requireUuid } from '../validation.js';
-
-const { DOCTOR, PHARMACIST, REGULATOR } = ROLES;
-const ANY = [DOCTOR, PHARMACIST, REGULATOR];
 
 export function prescriptionRoutes(fabric) {
   const router = Router();
 
-  router.get('/drugs', requireRole(...ANY), async (req, res) => {
+  router.get('/drugs', async (req, res) => {
     res.json(await fabric.evaluate(req.user.username, CONTRACTS.QUERY, 'GetDrugReference'));
   });
 
-  router.post('/prescriptions', requireRole(DOCTOR), async (req, res) => {
+  router.post('/prescriptions', async (req, res) => {
     const body = req.body;
     const args = [
       randomUUID(),
@@ -43,23 +40,23 @@ export function prescriptionRoutes(fabric) {
     res.status(201).json(prescription);
   });
 
-  router.get('/prescriptions/:id', requireRole(...ANY), async (req, res) => {
+  router.get('/prescriptions/:id', async (req, res) => {
     const id = requireUuid(req.params.id);
     res.json(await fabric.evaluate(req.user.username, CONTRACTS.PRESCRIPTION, 'ReadPrescription', [id]));
   });
 
-  router.get('/prescriptions/:id/status', requireRole(...ANY), async (req, res) => {
+  router.get('/prescriptions/:id/status', async (req, res) => {
     const id = requireUuid(req.params.id);
     const status = await fabric.evaluate(req.user.username, CONTRACTS.QUERY, 'GetPrescriptionStatus', [id]);
     res.json({ prescriptionId: id, status });
   });
 
-  router.get('/prescriptions/:id/patient', requireRole(DOCTOR, PHARMACIST), async (req, res) => {
+  router.get('/prescriptions/:id/patient', async (req, res) => {
     const id = requireUuid(req.params.id);
     res.json(await fabric.evaluate(req.user.username, CONTRACTS.PRESCRIPTION, 'ReadPatientData', [id]));
   });
 
-  router.post('/prescriptions/:id/revoke', requireRole(DOCTOR), async (req, res) => {
+  router.post('/prescriptions/:id/revoke', async (req, res) => {
     const id = requireUuid(req.params.id);
     const reason = requireText(req.body, 'reason');
     res
@@ -67,7 +64,7 @@ export function prescriptionRoutes(fabric) {
       .json(await fabric.submit(req.user.username, CONTRACTS.PRESCRIPTION, 'RevokePrescription', [id, reason]));
   });
 
-  router.get('/doctors/me/prescriptions', requireRole(DOCTOR), async (req, res) => {
+  router.get('/doctors/me/prescriptions', async (req, res) => {
     const { username, msp } = req.user;
     res.json(await fabric.evaluate(username, CONTRACTS.QUERY, 'GetPrescriptionsByDoctor', [msp, username]));
   });

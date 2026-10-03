@@ -110,13 +110,24 @@ medledger/
 │   │       └── audit.js
 │   └── test/                    # unit tests (fake Fabric) + live.test.js
 ├── web/
-│   ├── package.json
-│   └── src/
-│       ├── App.jsx
-│       └── views/
-│           ├── DoctorView.jsx
-│           ├── PharmacistView.jsx
-│           └── RegulatorView.jsx
+│   ├── package.json             # + vite.config.js (dev proxy), babel.config.cjs (Jest only)
+│   ├── index.html
+│   ├── src/
+│   │   ├── main.jsx
+│   │   ├── App.jsx              # session + role → view
+│   │   ├── api.js               # fetch client
+│   │   ├── ApiContext.jsx       # injects the client (fake in tests)
+│   │   ├── rules.js             # rule names, evaluation order, checklist
+│   │   ├── accounts.js          # demo accounts
+│   │   ├── useAction.js         # busy/error state for async actions
+│   │   ├── components/          # StatusBadge, ErrorBanner, RuleChecklist, …
+│   │   └── views/
+│   │       ├── LoginView.jsx
+│   │       ├── DoctorView.jsx
+│   │       ├── IssueForm.jsx
+│   │       ├── PharmacistView.jsx
+│   │       └── RegulatorView.jsx
+│   └── test/
 └── demo/
     ├── seed.sh
     └── fraud-scenarios.sh

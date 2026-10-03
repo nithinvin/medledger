@@ -16,9 +16,9 @@
 | 3 | Identity Enrollment | M1 | ✅ Done | `64667cf` |
 | 4 | Chaincode Implementation | M2 — Contract working | ✅ Done | `460463c` |
 | 5 | Chaincode Deployment | M2 | ✅ Done | `ea59fd2` |
-| 6 | API Gateway | M3 — Application layer | ✅ Done | *(next commit)* |
-| 7 | Web UI | M3 | ⏳ Next | — |
-| 8 | Demo Scenarios and Documentation | M4 — Demo ready | — | — |
+| 6 | API Gateway | M3 — Application layer | ✅ Done | `a226e45` |
+| 7 | Web UI | M3 | ✅ Done | *(next commit)* |
+| 8 | Demo Scenarios and Documentation | M4 — Demo ready | ⏳ Next | — |
 
 Update this table when a phase's exit gate passes.
 
@@ -260,14 +260,17 @@ Update this table when a phase's exit gate passes.
 
 **Goal:** Role-specific views for doctor, pharmacist, and regulator.
 
-**Deliverables:** `web/src/` (`App.jsx`, `views/*.jsx`).
+**Deliverables:** `web/src/` (`App.jsx`, `api.js`, `views/*.jsx`, `components/`), `web/test/`.
 
 **Steps:**
-1. Implement the login screen and the three views per [Web UI](design/application.md#web-ui).
+1. Implement the login screen and the three views per [Web UI](design/application.md#web-ui), including the cross-role demo panels.
+2. Write Jest + React Testing Library tests against an injected fake API: each view's happy path, rejections with rule IDs, dispense gating, and the rule checklist.
+3. Verify against the live stack: API + Vite dev server, full flow through the `/api` proxy.
 
 **Exit gate:**
 - All three role views function end-to-end
 - Attempting a cross-role action is visibly blocked with the rule reason displayed
+- `npm test`, `npm run lint`, `npm run format:check`, and `npm run build` clean in `web/`
 
 ---
 
