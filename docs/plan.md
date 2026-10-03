@@ -18,7 +18,7 @@
 | 5 | Chaincode Deployment | M2 | ✅ Done | `ea59fd2` |
 | 6 | API Gateway | M3 — Application layer | ✅ Done | `a226e45` |
 | 7 | Web UI | M3 | ✅ Done | `866a9be` |
-| 8 | Demo Scenarios and Documentation | M4 — Demo ready | ✅ Done | *(next commit)* |
+| 8 | Demo Scenarios and Documentation | M4 — Demo ready | ✅ Done | `e512cb9` |
 
 Update this table when a phase's exit gate passes.
 

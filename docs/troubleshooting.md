@@ -10,9 +10,20 @@ Symptom → cause → fix, grouped by area. Add new entries to the matching tabl
 |---|---|---|
 | Chaincode build fails with a Go toolchain/version error | `go.mod` `go` directive is newer than `fabric-ccenv`'s Go | Keep the pins in [architecture.md](design/architecture.md#technology-stack-and-versions); never `go get …@latest` for the contract API |
 | `golangci-lint` fails with `could not load export data ... unsupported version: 2` | Linter older than the Go toolchain (e.g. openSUSE's 1.60.3 package) | Install v2.14.0 per the [runbook](runbook.md#install), or use its Docker command |
-| Scripts fail with `$'\r': command not found` on WSL | CRLF line endings from a Windows-side checkout | Clone inside the WSL filesystem; `.gitattributes` forces LF on `*.sh` |
 | Bind mounts or Docker socket denied on openSUSE | SELinux enforcing | Every compose service already sets `label=disable`; check it was not removed |
 | Chaincode build fails with `lookup proxy.golang.org: i/o timeout` | Containers cannot resolve internet names — e.g. `/etc/docker/daemon.json` lists DNS servers unreachable from the current network (work/VPN resolvers) | Vendor modules before packaging (`go mod vendor`); `deployChaincode.sh` does this ([D16](decisions.md)) |
+
+## Windows / WSL
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `permission denied while trying to connect to the Docker daemon socket` | Your user joined the `docker` group in a shell opened earlier | Close and reopen the Ubuntu terminal (or `wsl --shutdown` in PowerShell, then reopen) |
+| `docker: command not found` inside Ubuntu with Docker Desktop installed | WSL integration not enabled for the distro | Docker Desktop → *Settings → Resources → WSL integration* → enable **Ubuntu-24.04**, then reopen the terminal |
+| `Cannot connect to the Docker daemon` with Docker Engine in WSL | systemd off, so the daemon did not start | Enable systemd in `/etc/wsl.conf` ([runbook](runbook.md#1-wsl-windows-11-only)), `wsl --shutdown`, reopen; then `sudo systemctl enable --now docker` |
+| Windows browser cannot open `http://localhost:5173` though `curl http://127.0.0.1:5173` works inside WSL | WSL localhost forwarding disabled or broken (e.g. by VPN software) | Check `%UserProfile%\.wslconfig` does not set `localhostForwarding=false`; `wsl --shutdown` and start again. On Windows 11 22H2+, `networkingMode=mirrored` under `[wsl2]` also works |
+| Statuses, expiry, or refill intervals look off after the laptop slept; TLS errors such as `certificate is not yet valid` | The WSL clock drifted behind Windows during sleep | `sudo hwclock -s`, or `wsl --shutdown` and reopen; then rerun `./run-demo.sh` if certificates were generated with the wrong time |
+| Scripts fail with `$'\r': command not found` | Repository cloned on the Windows side (CRLF line endings) | Clone inside WSL under `~/` ([runbook](runbook.md#4-clone-the-repository)) |
+| Everything is very slow; file permission errors | Repository is under `/mnt/c/...` | Clone inside WSL under `~/` |
 
 ## Crypto Material and Channel
 

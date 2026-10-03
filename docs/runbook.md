@@ -9,49 +9,136 @@
 | Host | Docker | Notes |
 |---|---|---|
 | openSUSE Leap 16.0 | Docker Engine from the distro repos | Leap 16 defaults to **SELinux** on fresh installs; systems upgraded from 15.x often keep AppArmor. The compose file sets `security_opt: [label=disable]` on every container, so bind mounts and the peers' Docker-socket access work under either, with no `:z` relabelling. |
-| Ubuntu 24.04 on Windows 11 WSL2 | Docker Desktop (WSL integration) **or** Docker Engine installed inside WSL | Clone the repo inside the Linux filesystem (`~/…`), never under `/mnt/c` (slow, loses exec bits). `.gitattributes` forces LF on `*.sh`. WSL defaults to half the host RAM (8 GB on a 16 GB machine), which is sufficient; raise it via `%UserProfile%\.wslconfig` if needed. Ports published on `127.0.0.1` in WSL are reachable from Windows browsers. |
+| Ubuntu 24.04 on Windows 11 WSL2 | Docker Engine installed inside WSL **or** Docker Desktop with WSL integration — pick one | Clone the repo inside the Linux filesystem (`~/…`), never under `/mnt/c` (slow, loses exec bits). Ports bound to `127.0.0.1` in WSL open from Windows browsers as `localhost`. WSL gets half the host RAM by default (8 GB on a 16 GB machine), which is enough. |
 
-Fabric binaries and images are `linux/amd64` and identical on both hosts; the scripts use only `bash`, `jq`, `curl`, `openssl`, and Docker, so no host-specific branches are needed. Docker needs about 8 GB of RAM.
+The host needs Docker, Go (for `go mod vendor` when deploying chaincode, and for chaincode tests), Node.js (API and web UI), and `bash`, `git`, `jq`, `curl`, `openssl`. Fabric binaries and images are `linux/amd64` on both hosts, so the scripts have no host-specific branches. First-time downloads total about 2.5 GB (Fabric images ~1.5 GB, Go, npm packages).
 
 ## Install
 
-Versions below are pinned in [architecture.md](design/architecture.md#technology-stack-and-versions); change them there first.
+Do these once per machine. Versions are pinned in [architecture.md](design/architecture.md#technology-stack-and-versions); change them there first.
 
-1. Install prerequisites:
-   - Docker Engine 24+ and Docker Compose v2 (on WSL: Docker Desktop with WSL integration, or Docker Engine installed inside the Ubuntu distro)
-   - Go 1.24+ (host toolchain for unit tests; chaincode itself is compiled inside `fabric-ccenv`)
-   - Node.js 22 LTS
-   - `jq`, `curl`, `openssl`, `git`
-   - ShellCheck, to lint the shell scripts:
+### 1. WSL (Windows 11 only)
 
-     | Host | Command |
-     |---|---|
-     | openSUSE Leap 16.0 | `sudo zypper install ShellCheck` |
-     | Ubuntu 24.04 | `sudo apt install shellcheck` |
-   - golangci-lint **v2.14.0**, to lint the chaincode. Use the official binary on both hosts — distro packages are too old (openSUSE's `golangci-lint` 1.60.3 fails on Go 1.24 code with `unsupported version: 2`):
-     ```
-     curl -sSfL https://golangci-lint.run/install.sh | sudo sh -s -- -b /usr/local/bin v2.14.0
-     golangci-lint version   # reports 2.14.0
-     ```
-     No install at all also works: use the Docker command in [Chaincode Development](#chaincode-development).
-   - On WSL: clone the repository under `~/`, not `/mnt/c`
-2. Download Fabric binaries and Docker images from the repository root (the files are git-ignored):
-   ```
-   curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
-   chmod +x install-fabric.sh
-   ./install-fabric.sh --fabric-version 2.5.16 --ca-version 1.5.22 binary docker
-   ```
-3. Pull the CouchDB image (`install-fabric.sh` does not fetch it):
-   ```
-   docker pull couchdb:3.3.3
-   ```
-4. Add the repository's `bin/` to `PATH` (e.g. in `~/.bashrc`).
-5. Verify:
-   ```
-   peer version                 # reports 2.5.16
-   fabric-ca-client version     # reports 1.5.22
-   docker images | grep -E 'hyperledger|couchdb'
-   ```
+In **PowerShell as Administrator**, install Ubuntu 24.04, reboot if asked, then open "Ubuntu 24.04" from the Start menu and create your Linux user:
+
+```powershell
+wsl --install -d Ubuntu-24.04
+```
+
+Inside Ubuntu, make sure systemd is on (needed for Docker Engine; Ubuntu 24.04 enables it by default):
+
+```bash
+systemctl is-system-running   # "running" or "degraded" is fine; an error means systemd is off
+```
+
+If it is off, add the following to `/etc/wsl.conf`, then run `wsl --shutdown` in PowerShell and reopen Ubuntu:
+
+```ini
+[boot]
+systemd=true
+```
+
+### 2. Docker
+
+**Ubuntu / WSL — option A (recommended): Docker Engine inside WSL.** Use Docker's own repository, not Ubuntu's `docker.io` package:
+
+```bash
+sudo apt-get update && sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker "$USER"
+```
+
+Then close and reopen the Ubuntu terminal so the `docker` group applies.
+
+**Ubuntu / WSL — option B: Docker Desktop.** Install Docker Desktop on Windows; in *Settings → Resources → WSL integration*, enable **Ubuntu-24.04**. Do not also install Docker Engine inside WSL.
+
+**openSUSE Leap 16.0:**
+
+```bash
+sudo zypper install docker docker-compose
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"   # then log out and back in
+```
+
+Check, on either host:
+
+```bash
+docker run --rm hello-world && docker compose version   # Compose v2.x
+```
+
+### 3. Go, Node.js, and tools
+
+**Ubuntu 24.04.** Its own `golang` (1.22) and `nodejs` (18) packages are too old; install from the upstream sources:
+
+```bash
+sudo apt-get install -y git jq curl openssl
+
+# Go: latest release from go.dev (any 1.24+ works)
+GO_VERSION="$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1)"
+curl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
+sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf /tmp/go.tgz && rm /tmp/go.tgz
+echo 'export PATH="$PATH:/usr/local/go/bin"' >> ~/.bashrc && source ~/.bashrc
+
+# Node.js 22 LTS from NodeSource
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+**openSUSE Leap 16.0:**
+
+```bash
+sudo zypper install go1.24 nodejs22 git jq curl openssl
+```
+
+Check: `go version` (1.24 or newer) and `node --version` (v22.12 or newer).
+
+**For development only** (not needed to run the demo):
+
+| Tool | Ubuntu 24.04 | openSUSE Leap 16.0 |
+|---|---|---|
+| ShellCheck | `sudo apt-get install -y shellcheck` | `sudo zypper install ShellCheck` |
+| golangci-lint v2.14.0 | `curl -sSfL https://golangci-lint.run/install.sh \| sudo sh -s -- -b /usr/local/bin v2.14.0` | same command |
+
+Use the official golangci-lint binary on both hosts — distro packages are too old (openSUSE's `golangci-lint` 1.60.3 fails on Go 1.24 code with `unsupported version: 2`). No install also works: use the Docker command in [Chaincode Development](#chaincode-development).
+
+### 4. Clone the repository
+
+On WSL, clone into your Linux home directory — never under `/mnt/c`:
+
+```bash
+cd ~
+git clone https://github.com/nithinvin/medledger.git   # or the SSH URL, with a key set up inside WSL
+cd medledger
+```
+
+### 5. Fabric binaries and images
+
+From the repository root (the downloads are git-ignored):
+
+```bash
+curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
+chmod +x install-fabric.sh
+./install-fabric.sh --fabric-version 2.5.16 --ca-version 1.5.22 binary docker
+docker pull couchdb:3.3.3   # install-fabric.sh does not fetch CouchDB
+```
+
+The network scripts find `bin/` by themselves. Add it to `PATH` only if you want to run `peer` and friends by hand: `echo "export PATH=\"\$PATH:$PWD/bin\"" >> ~/.bashrc`.
+
+### 6. Verify
+
+```bash
+./bin/peer version | grep Version               # v2.5.16
+./bin/fabric-ca-client version | grep Version   # v1.5.22
+docker images | grep -E 'hyperledger|couchdb'   # peer, orderer, ccenv, baseos, ca, couchdb
+```
+
+You are ready: run `./run-demo.sh` ([One-Command Startup](#one-command-startup)). The first run takes a few minutes longer while `npm ci` installs the API and web UI packages.
 
 ## Services, Ports, and Credentials
 
